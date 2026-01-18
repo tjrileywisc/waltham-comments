@@ -1,4 +1,5 @@
 *.mp3
+*.mp4
 *.mpeg
 creds.json
 token.json
