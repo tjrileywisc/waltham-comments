@@ -2,8 +2,6 @@
 MAX_UPLOAD_COUNT: 6
 telvue_url: https://videoplayer.telvue.com/player
 player_id: DczpPLv0_DQxyzqdZyE1r1a19QZz7VoL
-youtube_token_file: token.json
-client_secrets_file: creds.json
 playlists:
  City Council: 5499
  City Council Committees: 10088

@@ -1,14 +1,9 @@
-# CSEO Mirror
 
-Backup of public meetings for personal time shifted research use.
+# Waltham city council meeting diarization and transcription tool
 
+Keep city council honest by adding an extra level of transparency through diarization (identifying who said what) and
+transcriptioning of each statement said in session.
 
+Dependencies are managed by the wonderful `uv` tool. Diarization and transcription are handled by `whisperx`.
 
-
-### Helpful Documentation
-- [YouTube Data API Documentation](https://developers.google.com/youtube/v3/docs)
-- [Google API Python Client Documentation](https://googleapis.github.io/google-api-python-client/docs/epy/index.html)
-- [Google OAuth Library Documentation](https://googleapis.dev/python/google-auth-oauthlib/latest/index.html)
-
-### TODO
-- Better progress bar in the console
+(may also be a deliberately over-engineered refresher of python scripting for me)
