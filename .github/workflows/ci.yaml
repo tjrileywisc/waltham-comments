@@ -1,0 +1,27 @@
+name: ci
+
+on:
+  workflow_dispatch:
+
+jobs:
+  Daily-Upload:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: get python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: ".python-version"
+
+      - name: install deps
+        run: uv sync --locked --all-extras --dev
+
+      - name: Run tests
+        # For example, using `pytest`
+        run: uv run pytest tests

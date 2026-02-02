@@ -8,8 +8,34 @@ dependencies = [
     "bs4>=0.0.2",
     "lxml[html-clean]>=6.0.2",
     "playwright>=1.57.0",
+    "pytest>=9.0.2",
+    "pytest-cov>=7.0.0",
+    "pytest-mock>=3.15.1",
     "pyyaml>=6.0.3",
     "requests>=2.32.5",
     "requests-html>=0.10.0",
+    "sounddevice>=0.5.3",
+    "soundfile>=0.13.1",
+    "tensorboard>=2.20.0",
+    "torch>=2.8.0",
+    "torchcodec>=0.7.0",
     "tqdm>=4.67.1",
+    "whisperx>=3.7.6",
 ]
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.uv.sources]
+torch = [
+  {index = "pytorch-cu128"},
+]
+torchvision = [
+  {index = "pytorch-cu128"},
+]
+
+[tool.pytest.ini_options]
+addopts = "--cov=lib --cov-report=term-missing --cov-report=xml:coverage.xml"
+testpaths = ["tests"]
