@@ -3,11 +3,11 @@ import json
 
 config = dict()
 
-def get_config():
+def get_tokens():
     global config
-    config = json.load(open("config.json", "r"))
+    config = json.load(open("token.json", "r"))
 
-get_config()
+get_tokens()
 
 HF_TOKEN = config.get("HF_TOKEN", "")
 
