@@ -56,22 +56,41 @@ def transcription(meeting_name: str):
     diarize_model = DiarizationPipeline(use_auth_token=HF_TOKEN, device=DEVICE)
 
     # add min/max number of speakers if known
-    diarize_segments, speaker_embeddings = diarize_model(audio, min_speakers=MIN_SPEAKERS, max_speakers=MIN_SPEAKERS + 1, return_embeddings=True)
-
-    make_tensorboard_writer(speaker_embeddings)
-
-    Identifier.save_database(speaker_embeddings, f"data/speaker_db.pkl")
+    diarize_segments, speaker_embeddings = diarize_model(audio, min_speakers=MIN_SPEAKERS, return_embeddings=True)
 
     result = whisperx.assign_word_speakers(diarize_segments, result)
 
-    print(diarize_segments)
-    print(result["segments"]) # segments are now assigned speaker IDs
+    # TODO: run identification on the speaker embeddings from this meeting against our database
 
+    # the speaker embeddings are used to match speakers between transcription runs; we want to be careful not
+    # to overwrite it. it should be a database that is 'typical' for a meeting, i.e. best not to choose a meeting
+    # with public comment as that will generate a lot of new speakers.
+
+    new_speaker_ids = None
+    if not os.path.exists("data/speaker_db.pkl"):
+        Identifier.save_database(speaker_embeddings, f"data/speaker_db.pkl")
+    else:
+        # load the speaker embeddings database and try to match our current vectors against it
+        identifier = Identifier()
+        new_speaker_ids = identifier(speaker_embeddings)
+
+        # TODO: for each segment in result['segments'], index the SPEAKER_XX into the speaker ids we determined by cosine similarity
+        
+    # cleanup
+    
     # we don't need the 'words' array for each segment
     for segment in result["segments"]:
         segment.pop("words", None)
         
+        if new_speaker_ids:
+            # for example, SPEAKER_00
+            old_speaker_id = segment["speaker"]
+            old_speaker_idx = int(old_speaker_id.split("_")[1])
+            new_speaker_id = new_speaker_ids[old_speaker_idx]
+            segment["speaker"] = new_speaker_id
+
     pd.DataFrame(result["segments"]).to_csv(f"transcriptions/{meeting_name}.csv", index=False)
     
 if __name__ == "__main__":
-    transcription("City Council 1-12-26")
+    import sys
+    transcription(sys.argv[1])
