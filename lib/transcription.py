@@ -62,8 +62,8 @@ def transcription(meeting_name: str):
     # with public comment as that will generate a lot of new speakers.
 
     new_speaker_ids = None
-    if not os.path.exists("data/speaker_db.pkl"):
-        Identifier.save_database(speaker_embeddings, f"data/speaker_db.pkl")
+    if not os.path.exists(Identifier.DB_PATH):
+        Identifier.save_db(speaker_embeddings)
     else:
         # load the speaker embeddings database and try to match our current vectors against it
         identifier = Identifier()

@@ -11,6 +11,8 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 class Identifier:
 
+    DB_PATH = "data/speaker_db.pkl"
+
     # cosine similarity threshold for matching speakers
     SIMILARITY_THRESHOLD = 0.7
     # the speaker we'll use for anyone not expected to speak regularly
@@ -23,10 +25,15 @@ class Identifier:
             database (Dict[str, NDArray[np.float64]], optional): a database to pass. If not provided, the default will be loaded from the filesystem.
         """
         self.database = database or self.load_db()
+        
+    
+    @staticmethod
+    def save_db(speaker_embeddings: Dict[str, NDArray[np.float64]]):
+        pickle.dump(speaker_embeddings, open(Identifier.DB_PATH, "wb"))
 
     def load_db(self):
         # load existing database
-        with open("data/speaker_db.pkl", "rb") as f:
+        with open(Identifier.DB_PATH, "rb") as f:
             self.database = pickle.load(f)
 
     def __call__(self, speaker_embeddings: Dict[str, NDArray[np.float64]]) -> List[str]:
