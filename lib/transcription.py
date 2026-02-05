@@ -38,7 +38,6 @@ def transcription(meeting_name: str):
 
     audio = whisperx.load_audio(audio_file)
     result = model.transcribe(audio, batch_size=BATCH_SIZE)
-    print(result["segments"]) # before alignment
 
     # delete model if low on GPU resources
     # import gc; import torch; gc.collect(); torch.cuda.empty_cache(); del model
@@ -47,8 +46,6 @@ def transcription(meeting_name: str):
     model_a, metadata = whisperx.load_align_model(language_code=result["language"], device=DEVICE)
     result = whisperx.align(result["segments"], model_a, metadata, audio, DEVICE, return_char_alignments=False)
 
-    # print(result["segments"]) # after alignment
-
     # delete model if low on GPU resources
     # import gc; import torch; gc.collect(); torch.cuda.empty_cache(); del model_a
 
@@ -56,22 +53,37 @@ def transcription(meeting_name: str):
     diarize_model = DiarizationPipeline(use_auth_token=HF_TOKEN, device=DEVICE)
 
     # add min/max number of speakers if known
-    diarize_segments, speaker_embeddings = diarize_model(audio, min_speakers=MIN_SPEAKERS, max_speakers=MIN_SPEAKERS + 1, return_embeddings=True)
-
-    make_tensorboard_writer(speaker_embeddings)
-
-    Identifier.save_database(speaker_embeddings, f"data/speaker_db.pkl")
+    diarize_segments, speaker_embeddings = diarize_model(audio, min_speakers=MIN_SPEAKERS, return_embeddings=True)
 
     result = whisperx.assign_word_speakers(diarize_segments, result)
 
-    print(diarize_segments)
-    print(result["segments"]) # segments are now assigned speaker IDs
+    # the speaker embeddings are used to match speakers between transcription runs; we want to be careful not
+    # to overwrite it. it should be a database that is 'typical' for a meeting, i.e. best not to choose a meeting
+    # with public comment as that will generate a lot of new speakers.
 
+    new_speaker_ids = None
+    if not os.path.exists(Identifier.DB_PATH):
+        Identifier.save_db(speaker_embeddings)
+    else:
+        # load the speaker embeddings database and try to match our current vectors against it
+        identifier = Identifier()
+        new_speaker_ids = identifier(speaker_embeddings)
+
+    # cleanup
+    
     # we don't need the 'words' array for each segment
     for segment in result["segments"]:
         segment.pop("words", None)
         
+        if new_speaker_ids:
+            # for example, SPEAKER_00
+            old_speaker_id = segment["speaker"]
+            old_speaker_idx = int(old_speaker_id.split("_")[1])
+            new_speaker_id = new_speaker_ids[old_speaker_idx]
+            segment["speaker"] = new_speaker_id
+
     pd.DataFrame(result["segments"]).to_csv(f"transcriptions/{meeting_name}.csv", index=False)
     
 if __name__ == "__main__":
-    transcription("City Council 1-12-26")
+    import sys
+    transcription(sys.argv[1])

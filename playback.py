@@ -15,7 +15,7 @@ def playback(meeting_name: str):
     data, samplerate = sf.read(f"audio/{meeting_name}.wav")
 
     # Load diarization results
-    df = pd.read_csv(f"diarization/{meeting_name}.csv")
+    df = pd.read_csv(f"transcriptions/{meeting_name}.csv")
 
     for speaker, group in df.groupby('speaker'):
 
@@ -28,15 +28,17 @@ def playback(meeting_name: str):
                 continue
             
             seg_start = row['start']
-            seg_end = row['stop']
+            seg_end = row['end']
             
             example_duration += (seg_end - seg_start)
             example_number += 1
 
             segment = data[int(seg_start*samplerate) : int(seg_end*samplerate)]
             print(f"  Playing segment from {seg_start} to {seg_end} seconds")
+            print(row['text'])
             sd.play(segment, samplerate)
             sd.wait()
             
 if __name__ == "__main__":
-    playback("City Council 1-12-26")
+    import sys
+    playback(sys.argv[1])
