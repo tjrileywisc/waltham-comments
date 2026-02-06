@@ -1,5 +1,4 @@
-
-from . import HF_TOKEN, MIN_SPEAKERS
+from . import HF_TOKEN, MIN_SPEAKERS, MAX_SPEAKERS
 from .utils import make_tensorboard_writer
 
 from .identification import Identifier
@@ -26,7 +25,7 @@ def transcription(meeting_name: str):
     """
 
     audio_file = f"audio/{meeting_name}.wav"
-    
+
     os.makedirs("transcriptions", exist_ok=True)
 
     # 1. Transcribe with original whisper (batched)
@@ -53,7 +52,12 @@ def transcription(meeting_name: str):
     diarize_model = DiarizationPipeline(use_auth_token=HF_TOKEN, device=DEVICE)
 
     # add min/max number of speakers if known
-    diarize_segments, speaker_embeddings = diarize_model(audio, min_speakers=MIN_SPEAKERS, return_embeddings=True)
+    diarize_segments, speaker_embeddings = diarize_model(
+        audio,
+        min_speakers=MIN_SPEAKERS,
+        max_speakers=MAX_SPEAKERS,
+        return_embeddings=True,
+    )
 
     result = whisperx.assign_word_speakers(diarize_segments, result)
 
@@ -70,11 +74,11 @@ def transcription(meeting_name: str):
         new_speaker_ids = identifier(speaker_embeddings)
 
     # cleanup
-    
+
     # we don't need the 'words' array for each segment
     for segment in result["segments"]:
         segment.pop("words", None)
-        
+
         if new_speaker_ids:
             # for example, SPEAKER_00
             old_speaker_id = segment["speaker"]
@@ -82,8 +86,10 @@ def transcription(meeting_name: str):
             new_speaker_id = new_speaker_ids[old_speaker_idx]
             segment["speaker"] = new_speaker_id
 
-    pd.DataFrame(result["segments"]).to_csv(f"transcriptions/{meeting_name}.csv", index=False)
-    
+    df = pd.DataFrame(result["segments"])
+
+    df.to_csv(f"transcriptions/{meeting_name}.csv", index_label="id")
+
 if __name__ == "__main__":
     import sys
     transcription(sys.argv[1])
