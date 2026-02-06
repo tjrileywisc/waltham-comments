@@ -24,9 +24,11 @@ class Identifier:
         Args:
             database (Dict[str, NDArray[np.float64]], optional): a database to pass. If not provided, the default will be loaded from the filesystem.
         """
-        self.database = database or self.load_db()
-        
-    
+        if not database:
+            self.load_db()
+        else:
+            self.database = database
+
     @staticmethod
     def save_db(speaker_embeddings: Dict[str, NDArray[np.float64]]):
         pickle.dump(speaker_embeddings, open(Identifier.DB_PATH, "wb"))
