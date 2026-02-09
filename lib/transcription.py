@@ -28,8 +28,9 @@ def transcription(meeting_name: str):
 
     os.makedirs("transcriptions", exist_ok=True)
 
-    # 1. Transcribe with original whisper (batched)
-    model = whisperx.load_model("base", DEVICE, compute_type=COMPUTE_TYPE)
+    os.makedirs("models", exist_ok=True)
+    model = whisperx.load_model("large-v2", DEVICE, compute_type=COMPUTE_TYPE, language="en", download_root="models")
+
 
     # save model to local path (optional)
     # model_dir = "/path/"
@@ -81,6 +82,12 @@ def transcription(meeting_name: str):
 
         if new_speaker_ids:
             # for example, SPEAKER_00
+            if not "speaker" in segment:
+                # TODO: determine why this might happen, seems to have something to do
+                # with the model (it happens on large-v2 but not base)
+                segment["speaker"] = Identifier.DEFAULT_SPEAKER
+                continue
+
             old_speaker_id = segment["speaker"]
             old_speaker_idx = int(old_speaker_id.split("_")[1])
             new_speaker_id = new_speaker_ids[old_speaker_idx]
