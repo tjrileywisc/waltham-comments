@@ -75,7 +75,7 @@ class Identifier:
         speakers = [
             (
                 database_keys[i]
-                if max_scores[i] >= Identifier.SIMILARITY_THRESHOLD
+                if (i < len(database_keys)) and (max_scores[i] >= Identifier.SIMILARITY_THRESHOLD)
                 else Identifier.DEFAULT_SPEAKER
             )
             for i in range(len(speaker_embeddings))

@@ -1,22 +1,20 @@
 
 .venv
 __pycache__/
+.DS_Store
 
+# data outputs and ml models
 diarization
 audio
 videos
 transcriptions
 data
 runs
+models
 
 creds.json
 token.json
-.DS_Store
-
 
 # Unit test / coverage reports
 .coverage
 coverage.xml
-
-# Environments
-.venv

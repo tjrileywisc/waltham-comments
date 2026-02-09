@@ -38,9 +38,7 @@ def test_identifier_more_speakers_in_db():
         assert speaker == "DB_0" + str(i)
 
 def test_identifier_more_speakers_in_meeting():
-    
-    Identifier()
-    
+
     db_vectors = np.eye(10, dtype=np.float64)
     db_vectors = db_vectors[:5]
     db = {"DB_0" + str(i) : db_vectors[i] for i in range(len(db_vectors))}
