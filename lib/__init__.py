@@ -16,3 +16,9 @@ MIN_SPEAKERS = 5
 
 # 15 city council members, the clerk, the mayor, and 1 extra for unidentified speakers
 MAX_SPEAKERS = 15 + 1 + 1 + 1
+
+MODELS_DIR = "models"
+
+# normalize field names
+SPEAKER = "speaker"
+TEXT = "text"
