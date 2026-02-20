@@ -1,4 +1,4 @@
-from . import HF_TOKEN, MIN_SPEAKERS, MAX_SPEAKERS
+from . import HF_TOKEN, MIN_SPEAKERS, MAX_SPEAKERS, MODELS_DIR, TEXT, SPEAKER
 from .utils import make_tensorboard_writer
 
 from .identification import Identifier
@@ -27,9 +27,9 @@ def transcription(meeting_name: str):
     audio_file = f"audio/{meeting_name}.wav"
 
     os.makedirs("transcriptions", exist_ok=True)
+    os.makedirs(MODELS_DIR, exist_ok=True)
 
-    os.makedirs("models", exist_ok=True)
-    model = whisperx.load_model("large-v2", DEVICE, compute_type=COMPUTE_TYPE, language="en", download_root="models")
+    model = whisperx.load_model("large-v2", DEVICE, compute_type=COMPUTE_TYPE, language="en", download_root=MODELS_DIR)
 
 
     # save model to local path (optional)
@@ -82,16 +82,16 @@ def transcription(meeting_name: str):
 
         if new_speaker_ids:
             # for example, SPEAKER_00
-            if not "speaker" in segment:
+            if not SPEAKER in segment:
                 # TODO: determine why this might happen, seems to have something to do
                 # with the model (it happens on large-v2 but not base)
-                segment["speaker"] = Identifier.DEFAULT_SPEAKER
+                segment[SPEAKER] = Identifier.DEFAULT_SPEAKER
                 continue
 
-            old_speaker_id = segment["speaker"]
+            old_speaker_id = segment[SPEAKER]
             old_speaker_idx = int(old_speaker_id.split("_")[1])
             new_speaker_id = new_speaker_ids[old_speaker_idx]
-            segment["speaker"] = new_speaker_id
+            segment[SPEAKER] = new_speaker_id
 
     df = pd.DataFrame(result["segments"])
 
