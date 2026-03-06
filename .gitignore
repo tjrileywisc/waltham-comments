@@ -4,14 +4,16 @@ __pycache__/
 .DS_Store
 
 # data outputs and ml models
-diarization
 audio
-videos
-transcriptions
 data
+diarization
+logs
 runs
 models
+transcriptions
+videos
 
+# credentials and such
 creds.json
 token.json
 

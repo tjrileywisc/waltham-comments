@@ -1,9 +1,12 @@
 
+from lib.utils import setup_logging
+
+setup_logging()
+
 import os
+import logging
 
 from lib.download import MeetingDownloader
-
-import logging
 
 if __name__ == "__main__":
 
@@ -23,7 +26,10 @@ if __name__ == "__main__":
 
     for meeting in meeting_metadata:
         try:
-            downloader.get_download_url(meeting)
+            m3u8_url = downloader.get_download_url(meeting)
+            if m3u8_url:
+                downloader.download_meeting(m3u8_url, meeting.name)
+    
         except Exception as e:
             logging.error("Error downloading meeting {}: {}".format(meeting.name, str(e)))
             if os.path.exists(meeting.filename):
