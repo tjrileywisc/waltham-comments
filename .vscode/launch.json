@@ -20,6 +20,14 @@
             "args": [
                 "${input:name}"
             ]
+        },
+        {
+            "name": "debug download",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "main.py",
+            "console": "integratedTerminal",
+            "args": []
         }
     ]
 }
