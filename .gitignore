@@ -2,6 +2,7 @@
 .venv
 __pycache__/
 .DS_Store
+.env
 
 # data outputs and ml models
 audio
@@ -12,10 +13,6 @@ runs
 models
 transcriptions
 videos
-
-# credentials and such
-creds.json
-token.json
 
 # Unit test / coverage reports
 .coverage

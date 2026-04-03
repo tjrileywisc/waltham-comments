@@ -1,3 +1,4 @@
+name: waltham-comments
 services:
   embeddings-service:
     build:
@@ -39,8 +40,38 @@ services:
 
 volumes:
   embeddings-models:
+    driver: local
+    driver_opts:
+      type: none
+      device: "c:/workspace/waltham-comments/models"
+      o: bind
   meeting-videos:
+      driver: local
+      driver_opts:
+        type: none
+        device: "c:/workspace/waltham-comments/videos"
+        o: bind
   meeting-audio:
+      driver: local
+      driver_opts:
+        type: none
+        device: "c:/workspace/waltham-comments/audio"
+        o: bind
   meeting-transcriptions:
+      driver: local
+      driver_opts:
+        type: none
+        device: "c:/workspace/waltham-comments/transcriptions"
+        o: bind
   speaker-db:
+      driver: local
+      driver_opts:
+        type: none
+        device: "c:/workspace/waltham-comments/data"
+        o: bind
   transcription-models:
+      driver: local
+      driver_opts:
+        type: none
+        device: "c:/workspace/waltham-comments/models"
+        o: bind
