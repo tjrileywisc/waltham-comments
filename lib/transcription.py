@@ -31,11 +31,6 @@ def transcription(meeting_name: str):
 
     model = whisperx.load_model("large-v2", DEVICE, compute_type=COMPUTE_TYPE, language="en", download_root=MODELS_DIR)
 
-
-    # save model to local path (optional)
-    # model_dir = "/path/"
-    # model = whisperx.load_model("large-v2", device, compute_type=compute_type, download_root=model_dir)
-
     audio = whisperx.load_audio(audio_file)
     result = model.transcribe(audio, batch_size=BATCH_SIZE)
 
@@ -67,12 +62,13 @@ def transcription(meeting_name: str):
     # with public comment as that will generate a lot of new speakers.
 
     new_speaker_ids = None
-    if not os.path.exists(Identifier.DB_PATH):
-        Identifier.save_db(speaker_embeddings)
-    else:
-        # load the speaker embeddings database and try to match our current vectors against it
-        identifier = Identifier()
-        new_speaker_ids = identifier(speaker_embeddings)
+    if speaker_embeddings:
+        if not os.path.exists(Identifier.DB_PATH):
+            Identifier.save_db(speaker_embeddings)
+        else:
+            # load the speaker embeddings database and try to match our current vectors against it
+            identifier = Identifier()
+            new_speaker_ids = identifier(speaker_embeddings)
 
     # cleanup
 

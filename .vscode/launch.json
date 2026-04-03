@@ -11,7 +11,12 @@
         }
     ],
     "configurations": [
-
+        {
+            "name": "debug audio",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "lib.audio"
+        },
         {
             "name": "debug transcription",
             "type": "debugpy",

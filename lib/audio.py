@@ -33,3 +33,14 @@ def extract_audio(meeting_name: str):
     ]
 
     subprocess.run(cmd, check=True)
+    
+if __name__ == "__main__":
+    import glob
+    
+    videos = glob.glob("videos/*.mp4")
+    
+    for video in videos:
+        video = video.replace("\\", "/")
+        print(f"extracting audio from {video}")
+        video = video.replace("videos/", "").replace(".mp4", "")
+        extract_audio(video)
