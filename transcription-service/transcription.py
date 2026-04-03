@@ -1,5 +1,5 @@
 import os
-
+import logging
 from utils import make_tensorboard_writer
 from identification import Identifier
 
@@ -46,17 +46,17 @@ def transcription(meeting_name: str):
     result = model.transcribe(audio, batch_size=BATCH_SIZE)
 
     # delete model if low on GPU resources
-    # import gc; import torch; gc.collect(); torch.cuda.empty_cache(); del model
+    import gc; import torch; gc.collect(); torch.cuda.empty_cache(); del model
 
-    # 2. Align whisper output
+    logging.info("Aligning whisper output")
     model_a, metadata = whisperx.load_align_model(language_code=result["language"], device=DEVICE)
     result = whisperx.align(result["segments"], model_a, metadata, audio, DEVICE, return_char_alignments=False)
 
     # delete model if low on GPU resources
-    # import gc; import torch; gc.collect(); torch.cuda.empty_cache(); del model_a
+    import gc; import torch; gc.collect(); torch.cuda.empty_cache(); del model_a
 
-    # 3. Assign speaker labels
-    diarize_model = DiarizationPipeline(use_auth_token=HF_TOKEN, device=DEVICE)
+    logging.info("Assiging speaker labels")
+    diarize_model = DiarizationPipeline(token=HF_TOKEN, device=DEVICE)
 
     # add min/max number of speakers if known
     diarize_segments, speaker_embeddings = diarize_model(
@@ -75,9 +75,11 @@ def transcription(meeting_name: str):
     new_speaker_ids = None
     if speaker_embeddings:
         if not os.path.exists(Identifier.DB_PATH):
+            logging.info("Generating speaker database")
             Identifier.save_db(speaker_embeddings)
         else:
             # load the speaker embeddings database and try to match our current vectors against it
+            logging.info("Matching identifying existing speakers")
             identifier = Identifier()
             new_speaker_ids = identifier(speaker_embeddings)
 
