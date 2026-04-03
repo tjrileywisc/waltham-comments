@@ -2,7 +2,7 @@
 import pytest
 import numpy as np
 
-from lib.sentence_embeddings import generate_embeddings
+from sentence_embeddings import generate_embeddings
 
 def test_sentence_embeddings():
 

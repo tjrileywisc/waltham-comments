@@ -1,4 +1,3 @@
-
 import logging
 import logging.handlers
 import os
@@ -12,7 +11,7 @@ def make_tensorboard_writer(embeddings_dict):
     vectors = list(embeddings_dict.values())
 
     embedding_tensor = torch.tensor(vectors)
-        
+
     writer = SummaryWriter(log_dir="runs/embeddings")
 
     writer.add_embedding(
@@ -22,7 +21,7 @@ def make_tensorboard_writer(embeddings_dict):
     )
 
     writer.close()
-    
+
 def setup_logging(log_dir: str = "logs", log_file: str = "meeting_downloader.log"):
     os.makedirs(log_dir, exist_ok=True)
     log_path = os.path.join(log_dir, log_file)

@@ -1,0 +1,46 @@
+services:
+  embeddings-service:
+    build:
+      context: .
+      dockerfile: embeddings-service/Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - embeddings-models:/app/models
+  meeting-downloader:
+    build:
+      context: .
+      dockerfile: meeting-downloader/Dockerfile
+    volumes:
+      - meeting-videos:/app/videos
+      - meeting-audio:/app/audio
+  transcription-service:
+    build:
+      context: .
+      dockerfile: transcription-service/Dockerfile
+    environment:
+      - HF_TOKEN=${HF_TOKEN}
+    volumes:
+      - meeting-audio:/app/audio
+      - meeting-transcriptions:/app/transcriptions
+      - speaker-db:/app/data
+      - transcription-models:/app/models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+  # web:
+  #   build:
+  #     context: ./waltham-comments-page
+  #     dockerfile: ./waltham-comments-page/Dockerfile
+
+volumes:
+  embeddings-models:
+  meeting-videos:
+  meeting-audio:
+  meeting-transcriptions:
+  speaker-db:
+  transcription-models:

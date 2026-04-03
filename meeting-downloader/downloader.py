@@ -1,4 +1,3 @@
-
 import subprocess
 import logging
 import json
@@ -7,9 +6,8 @@ import requests
 import yaml
 import time
 import shutil
-from urllib.parse import unquote
 
-from .publicmeeting import PublicMeeting
+from publicmeeting import PublicMeeting
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 from tqdm import tqdm
@@ -47,17 +45,17 @@ class MeetingDownloader:
             List: a list of PublicMeeting objects
         """
         public_meetings = []
-        
+
         if playlists is not None:
             # filter
             self.playlists = {k: v for k, v in self.playlists.items() if k in playlists}
 
         for org_name, playlist_id in self.playlists.items():
-            
+
             self.session.headers.update({
                 "Referer": f"https://videoplayer.telvue.com/player/{self.player_id}/playlists/{playlist_id}"
             })
-            
+
             time.sleep(2)   # add delay to mimic human browsing behavior
             res = self.session.get(
                 "{}/{}/playlists/{}".format(self.url, self.player_id, playlist_id)
@@ -69,7 +67,7 @@ class MeetingDownloader:
                 tag = meeting.find_next("a")
                 if not tag:
                     continue
-                
+
                 if 'href' not in tag.attrs:
                     continue
 
@@ -81,7 +79,7 @@ class MeetingDownloader:
                     continue
 
                 meeting_name = tag.string
-                
+
                 if meeting_name is None or PublicMeeting.meeting_exists(meeting_name):
                     continue
 
@@ -105,7 +103,7 @@ class MeetingDownloader:
         """
 
         page_url = f"{self.url}/{self.player_id}/media/{meeting.video_id}"
-        
+
         m3u8_url = None
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
@@ -118,7 +116,7 @@ class MeetingDownloader:
                 if "master.m3u8" in url and m3u8_url is None:
                     m3u8_url = url.replace("master.m3u8", "index-savc_1000k-v1-a1.m3u8")
                     logging.info(f"Captured: {m3u8_url}")
-                
+
                 route.abort()  # abort everything - master, variants, segments
 
             page.route("**/*.m3u8", handle_route)
@@ -138,7 +136,7 @@ class MeetingDownloader:
             return None
 
         return m3u8_url
-    
+
     def _get_file_duration(self, filepath: str) -> float:
         """Get the duration of the actually downloaded file.
 

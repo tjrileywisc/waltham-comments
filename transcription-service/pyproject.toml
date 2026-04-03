@@ -1,0 +1,23 @@
+[project]
+name = "transcription-service"
+version = "0.1.0"
+description = "Diarizes and transcribes Waltham public meeting audio"
+requires-python = "==3.13.*"
+dependencies = [
+    "huggingface-hub>=0.36.0",
+    "pandas>=2.0.0",
+    "scikit-learn>=1.0.0",
+    "tensorboard>=2.20.0",
+    "torch>=2.8.0",
+    "whisperx>=3.7.6",
+]
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.uv.sources]
+torch = [
+  {index = "pytorch-cu128"},
+]

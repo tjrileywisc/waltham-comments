@@ -1,8 +1,8 @@
 
 import pytest
 
-from lib.download import MeetingDownloader
-from lib.publicmeeting import PublicMeeting
+from downloader import MeetingDownloader
+from publicmeeting import PublicMeeting
 
 def test_wont_redownload_existing_meeting(mocker):
     
@@ -17,8 +17,8 @@ def test_wont_redownload_existing_meeting(mocker):
     </div>
     """
     
-    mocker.patch('lib.download.requests.Session.get', return_value=mock_response)
-    mocker.patch('lib.publicmeeting.PublicMeeting.meeting_exists', return_value=True)
+    mocker.patch('downloader.requests.Session.get', return_value=mock_response)
+    mocker.patch('publicmeeting.PublicMeeting.meeting_exists', return_value=True)
 
     downloader = MeetingDownloader()
     meetings = downloader.get_new_public_meetings(["City Council"])

@@ -1,9 +1,8 @@
-from . import HF_TOKEN, MIN_SPEAKERS, MAX_SPEAKERS, MODELS_DIR, TEXT, SPEAKER
-from .utils import make_tensorboard_writer
-
-from .identification import Identifier
-
 import os
+
+from utils import make_tensorboard_writer
+from identification import Identifier
+
 import pandas as pd
 import whisperx
 from whisperx.diarize import DiarizationPipeline
@@ -11,6 +10,18 @@ from whisperx.diarize import DiarizationPipeline
 # ref. https://github.com/m-bain/whisperX/issues/1304
 # a warning displays due to a potential security issue loading weights-only checkpoints
 os.environ["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] = "1"
+
+HF_TOKEN = os.environ.get("HF_TOKEN", "")
+
+# a small committee meeting
+MIN_SPEAKERS = int(os.environ.get("MIN_SPEAKERS", 5))
+
+# 15 city council members, the clerk, the mayor, and 1 extra for unidentified speakers
+MAX_SPEAKERS = int(os.environ.get("MAX_SPEAKERS", 18))
+
+MODELS_DIR = os.environ.get("MODELS_DIR", "models")
+TEXT = "text"
+SPEAKER = "speaker"
 
 DEVICE = "cuda"
 

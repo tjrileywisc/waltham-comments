@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 
-from lib.identification import Identifier
+from identification import Identifier
 
 def test_identifier_no_matches():
     db_vector = np.zeros((128), np.float64)
