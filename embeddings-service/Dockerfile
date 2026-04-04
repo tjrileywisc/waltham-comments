@@ -9,4 +9,4 @@ RUN uv sync --no-dev
 
 COPY embeddings-service/main.py embeddings-service/sentence_embeddings.py .
 
-CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001"]

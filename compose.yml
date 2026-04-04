@@ -5,7 +5,7 @@ services:
       context: .
       dockerfile: embeddings-service/Dockerfile
     ports:
-      - "8000:8000"
+      - "8001:8001"
     volumes:
       - embeddings-models:/app/models
   meeting-downloader:
