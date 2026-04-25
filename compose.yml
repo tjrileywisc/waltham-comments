@@ -7,25 +7,25 @@ services:
     ports:
       - "8001:8001"
     volumes:
-      - embeddings-models:/app/models
+      - C:/workspace/waltham-comments/models:/app/models
   meeting-downloader:
     build:
       context: .
       dockerfile: meeting-downloader/Dockerfile
     volumes:
-      - meeting-videos:/app/videos
-      - meeting-audio:/app/audio
+      - C:/workspace/waltham-comments/videos:/app/videos
+      - C:/workspace/waltham-comments/audio:/app/audio
   transcription-service:
     build:
       context: .
       dockerfile: transcription-service/Dockerfile
-    environment:
-      - HF_TOKEN=${HF_TOKEN}
+    env_file:
+      - .env
     volumes:
-      - meeting-audio:/app/audio
-      - meeting-transcriptions:/app/transcriptions
-      - speaker-db:/app/data
-      - transcription-models:/app/models
+      - C:/workspace/waltham-comments/audio:/app/audio
+      - C:/workspace/waltham-comments/transcriptions:/app/transcriptions
+      - C:/workspace/waltham-comments/data:/app/data
+      - C:/workspace/waltham-comments/models:/app/models
     deploy:
       resources:
         reservations:
@@ -33,45 +33,15 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
-  # web:
-  #   build:
-  #     context: ./waltham-comments-page
-  #     dockerfile: ./waltham-comments-page/Dockerfile
-
-volumes:
-  embeddings-models:
-    driver: local
-    driver_opts:
-      type: none
-      device: "c:/workspace/waltham-comments/models"
-      o: bind
-  meeting-videos:
-      driver: local
-      driver_opts:
-        type: none
-        device: "c:/workspace/waltham-comments/videos"
-        o: bind
-  meeting-audio:
-      driver: local
-      driver_opts:
-        type: none
-        device: "c:/workspace/waltham-comments/audio"
-        o: bind
-  meeting-transcriptions:
-      driver: local
-      driver_opts:
-        type: none
-        device: "c:/workspace/waltham-comments/transcriptions"
-        o: bind
-  speaker-db:
-      driver: local
-      driver_opts:
-        type: none
-        device: "c:/workspace/waltham-comments/data"
-        o: bind
-  transcription-models:
-      driver: local
-      driver_opts:
-        type: none
-        device: "c:/workspace/waltham-comments/models"
-        o: bind
+  web:
+    build:
+      context: ./waltham-comments-page
+      dockerfile: ./Dockerfile
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - C:/workspace/waltham-comments/videos:/app/videos
+      - C:/workspace/waltham-comments/transcriptions:/app/transcriptions
+      - C:/workspace/waltham-comments/data:/app/data
