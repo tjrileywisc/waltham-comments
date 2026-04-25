@@ -8,6 +8,14 @@ from audio import extract_audio
 
 POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL_SECONDS", 3600))
 
+PLAYLISTS = [
+    {
+        "City Council": 5499,
+        "City Council Committees": 10088,
+        "Zoning Board of Appeals": 5528,
+    }
+]
+
 logger = setup_logging("downloader")
 
 def main():
