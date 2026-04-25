@@ -7,6 +7,8 @@ import yaml
 import time
 import shutil
 
+from urllib3.util.retry import Retry
+from requests.adapters import HTTPAdapter
 from monitoring import setup_logging
 from publicmeeting import PublicMeeting
 from bs4 import BeautifulSoup
@@ -25,15 +27,26 @@ WCAC_HEADERS = {
     "Origin": "https://videoplayer.telvue.com"
 }
 
-
+logger = setup_logging("downloader")
 class MeetingDownloader:
     def __init__(self):
         settings = yaml.safe_load(open('settings.yaml', 'r'))
         self.url = settings['telvue_url']
         self.player_id = settings['player_id']
         self.playlists = settings['playlists']
+        
+        retry_strategy = Retry(
+            total=5,
+            backoff_factor=1.0,
+            status_forcelist=[429, 502, 503, 504],
+            raise_on_status=False
+        )
+
+        adapter = HTTPAdapter(max_retries=retry_strategy)
 
         self.session = requests.Session()
+        self.session.mount("https://", adapter)
+        self.session.mount("http://", adapter)
         self.session.headers.update(WCAC_HEADERS)
 
     def get_new_public_meetings(self, playlists: List | None) -> List[str]:
@@ -157,6 +170,16 @@ class MeetingDownloader:
         result = subprocess.run(cmd, capture_output=True, text=True)
         data = json.loads(result.stdout)
         return float(data["format"]["duration"])
+    
+    def _cleanup(self, ts_dir: str) -> None:
+        """Clean up the temporary download directory
+
+        Args:
+            ts_dir (str): the path to the temp segments directory for the video
+        """
+        
+        # clean up temp segments
+        shutil.rmtree(ts_dir, ignore_errors=True)
 
     def download_meeting(self, download_url: str, meeting_name: str):
         """Download a meeting from the site.
@@ -193,41 +216,44 @@ class MeetingDownloader:
         ts_dir = f"videos/.tmp_{meeting_name}"
         os.makedirs(ts_dir, exist_ok=True)
 
-        pbar = tqdm(total=total_duration, unit="s", desc=meeting_name)
-        for i, (seg_url, duration) in enumerate(segments):
-            seg_file = os.path.join(ts_dir, f"seg-{i:04d}.ts")
-            if not os.path.exists(seg_file):
-                time.sleep(0.1)  # small delay between requests
-                seg_resp = self.session.get(seg_url)
-                if seg_resp.status_code != 200:
-                    logging.error(f"Segment {i} returned {seg_resp.status_code}")
-                    return
-                with open(seg_file, "wb") as f:
-                    f.write(seg_resp.content)
-            pbar.update(duration)
-        pbar.close()
+        try:
+            pbar = tqdm(total=total_duration, unit="s", desc=meeting_name)
+            for i, (seg_url, duration) in enumerate(segments):
+                seg_file = os.path.join(ts_dir, f"seg-{i:04d}.ts")
+                if not os.path.exists(seg_file):
+                    time.sleep(0.1)  # small delay between requests
+                    seg_resp = self.session.get(seg_url)
+                    if seg_resp.status_code >= 400:
+                        logger.error(f"Segment {i} returned {seg_resp.status_code}")
+                        return
+                    with open(seg_file, "wb") as f:
+                        f.write(seg_resp.content)
+                pbar.update(duration)
+            pbar.close()
 
-        # write concat file for ffmpeg
-        concat_file = os.path.join(ts_dir, "concat.txt")
-        with open(concat_file, "w") as f:
-            for i in range(len(segments)):
-                f.write(f"file '{os.path.abspath(os.path.join(ts_dir, f'seg-{i:04d}.ts'))}'\n")
+            # write concat file for ffmpeg
+            concat_file = os.path.join(ts_dir, "concat.txt")
+            with open(concat_file, "w") as f:
+                for i in range(len(segments)):
+                    f.write(f"file '{os.path.abspath(os.path.join(ts_dir, f'seg-{i:04d}.ts'))}'\n")
 
-        # mux with ffmpeg locally - no network calls
-        cmd = [
-            "ffmpeg", "-y",
-            "-f", "concat",
-            "-safe", "0",
-            "-i", concat_file,
-            "-c", "copy",
-            output_file
-        ]
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode != 0:
-            logging.error(f"ffmpeg mux failed: {result.stderr[-500:]}")
-            return
+            # mux with ffmpeg locally - no network calls
+            cmd = [
+                "ffmpeg", "-y",
+                "-f", "concat",
+                "-safe", "0",
+                "-i", concat_file,
+                "-c", "copy",
+                output_file
+            ]
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                logger.error(f"ffmpeg mux failed: {result.stderr[-500:]}")
+                return
 
-        logging.info(f"Downloaded {meeting_name} ({total_duration:.0f}s)")
+            logger.info(f"Downloaded {meeting_name} ({total_duration:.0f}s)")
+        except Exception as e:
+            logger.warning(f"Failed to download {meeting_name}: {e}")
+        finally:
+            self._cleanup(ts_dir)
 
-        # clean up temp segments
-        shutil.rmtree(ts_dir, ignore_errors=True)
