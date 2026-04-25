@@ -27,7 +27,7 @@ SPEAKER = "speaker"
 
 DEVICE = "cuda"
 
-BATCH_SIZE = 16 # reduce if low on GPU mem
+BATCH_SIZE = 8 # reduce if low on GPU mem
 COMPUTE_TYPE = "float16" # change to "int8" if low on GPU mem (may reduce accuracy)
 
 def transcription(meeting_name: str):
