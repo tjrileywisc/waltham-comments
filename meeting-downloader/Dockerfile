@@ -14,6 +14,7 @@ RUN uv sync --no-dev
 RUN uv run playwright install chromium --with-deps
 
 COPY meeting-downloader/main.py meeting-downloader/downloader.py meeting-downloader/publicmeeting.py meeting-downloader/audio.py .
+COPY monitoring.py .
 COPY settings.yaml .
 
 CMD ["uv", "run", "python", "main.py"]

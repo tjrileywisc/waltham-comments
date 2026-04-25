@@ -1,11 +1,13 @@
 import os
-import logging
-from utils import make_tensorboard_writer
 from identification import Identifier
 
 import pandas as pd
 import whisperx
 from whisperx.diarize import DiarizationPipeline
+
+from monitoring import setup_logging
+
+logger = setup_logging("transcription")
 
 # ref. https://github.com/m-bain/whisperX/issues/1304
 # a warning displays due to a potential security issue loading weights-only checkpoints
@@ -48,14 +50,14 @@ def transcription(meeting_name: str):
     # delete model if low on GPU resources
     import gc; import torch; gc.collect(); torch.cuda.empty_cache(); del model
 
-    logging.info("Aligning whisper output")
+    logger.info("Aligning whisper output")
     model_a, metadata = whisperx.load_align_model(language_code=result["language"], device=DEVICE)
     result = whisperx.align(result["segments"], model_a, metadata, audio, DEVICE, return_char_alignments=False)
 
     # delete model if low on GPU resources
     import gc; import torch; gc.collect(); torch.cuda.empty_cache(); del model_a
 
-    logging.info("Assiging speaker labels")
+    logger.info("Assiging speaker labels")
     diarize_model = DiarizationPipeline(token=HF_TOKEN, device=DEVICE)
 
     # add min/max number of speakers if known
@@ -75,11 +77,11 @@ def transcription(meeting_name: str):
     new_speaker_ids = None
     if speaker_embeddings:
         if not os.path.exists(Identifier.DB_PATH):
-            logging.info("Generating speaker database")
+            logger.info("Generating speaker database")
             Identifier.save_db(speaker_embeddings)
         else:
             # load the speaker embeddings database and try to match our current vectors against it
-            logging.info("Matching identifying existing speakers")
+            logger.info("Matching identifying existing speakers")
             identifier = Identifier()
             new_speaker_ids = identifier(speaker_embeddings)
 

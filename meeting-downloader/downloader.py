@@ -7,6 +7,7 @@ import yaml
 import time
 import shutil
 
+from monitoring import setup_logging
 from publicmeeting import PublicMeeting
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
@@ -115,7 +116,7 @@ class MeetingDownloader:
 
                 if "master.m3u8" in url and m3u8_url is None:
                     m3u8_url = url.replace("master.m3u8", "index-savc_1000k-v1-a1.m3u8")
-                    logging.info(f"Captured: {m3u8_url}")
+                    logger.info(f"Captured: {m3u8_url}")
 
                 route.abort()  # abort everything - master, variants, segments
 
@@ -132,7 +133,7 @@ class MeetingDownloader:
             browser.close()
 
         if not m3u8_url:
-            logging.error(f"No playlist URL found for meeting {meeting.name}")
+            logger.error(f"No playlist URL found for meeting {meeting.name}")
             return None
 
         return m3u8_url
@@ -168,7 +169,7 @@ class MeetingDownloader:
         os.makedirs("videos", exist_ok=True)
 
         if os.path.exists(output_file):
-            logging.info(f"Meeting {meeting_name} already downloaded.")
+            logger.info(f"Meeting {meeting_name} already downloaded.")
             return
 
         # get the playlist
