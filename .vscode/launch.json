@@ -33,6 +33,20 @@
             "program": "main.py",
             "console": "integratedTerminal",
             "args": []
+        },
+        {
+            "name": "debug webserver",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "uvicorn",
+            "args": [
+                "main:app",
+                "--reload"
+            ],
+            "env": {
+                "DATA_DIR": "../waltham-comments"
+            },
+            "jinja": true
         }
     ]
 }

@@ -35,7 +35,7 @@ services:
               capabilities: [gpu]
   web:
     build:
-      context: ./waltham-comments-page
+      context: ./webapp
       dockerfile: ./Dockerfile
     env_file:
       - .env
