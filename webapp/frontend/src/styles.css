@@ -29,4 +29,5 @@
 .right-pane {
   flex: 1;
   overflow-y: auto;
+  height: 80vh;
 }
