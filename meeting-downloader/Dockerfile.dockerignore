@@ -1,0 +1,9 @@
+**
+!meeting-downloader/
+!meeting-downloader/pyproject.toml
+!meeting-downloader/main.py
+!meeting-downloader/downloader.py
+!meeting-downloader/publicmeeting.py
+!meeting-downloader/audio.py
+!monitoring.py
+!settings.yaml
