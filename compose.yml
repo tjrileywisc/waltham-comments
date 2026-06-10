@@ -4,6 +4,7 @@ services:
     build:
       context: .
       dockerfile: embeddings-service/Dockerfile
+    image: embeddings-service
     ports:
       - "8001:8001"
     volumes:
@@ -12,6 +13,7 @@ services:
     build:
       context: .
       dockerfile: meeting-downloader/Dockerfile
+    image: meeting-downloader
     volumes:
       - C:/workspace/waltham-comments/videos:/app/videos
       - C:/workspace/waltham-comments/audio:/app/audio
@@ -19,6 +21,7 @@ services:
     build:
       context: .
       dockerfile: transcription-service/Dockerfile
+    image: transcription-service
     env_file:
       - .env
     volumes:
@@ -37,6 +40,7 @@ services:
     build:
       context: ./webapp
       dockerfile: ./Dockerfile
+    image: comments-web
     env_file:
       - .env
     ports:
