@@ -1,3 +1,4 @@
+import gc
 import os
 from identification import Identifier
 
@@ -54,19 +55,19 @@ def transcription(meeting_name: str):
         compute_type=COMPUTE_TYPE,
         language="en",
         download_root=MODELS_DIR,
-        cpu_threads=CPU_THREADS,
+        cpu_threads=CPU_THREADS if CPU_THREADS > 0 else None,
     )
 
     audio = whisperx.load_audio(audio_file)
     result = model.transcribe(audio, batch_size=BATCH_SIZE)
 
-    import gc; gc.collect(); del model
+    gc.collect(); del model
 
     logger.info("Aligning whisper output")
     model_a, metadata = whisperx.load_align_model(language_code=result["language"], device=DEVICE)
     result = whisperx.align(result["segments"], model_a, metadata, audio, DEVICE, return_char_alignments=False)
 
-    import gc; gc.collect(); del model_a
+    gc.collect(); del model_a
 
     logger.info("Assigning speaker labels")
     diarize_model = DiarizationPipeline(token=HF_TOKEN, device=DEVICE)
@@ -94,6 +95,8 @@ def transcription(meeting_name: str):
         segment.pop("words", None)
 
         if new_speaker_ids:
+            # TODO: determine why this might happen, seems to have something to do
+            # with the model (it happens on large-v2 but not base)
             if not SPEAKER in segment:
                 segment[SPEAKER] = Identifier.DEFAULT_SPEAKER
                 continue
