@@ -29,13 +29,6 @@ services:
       - C:/workspace/waltham-comments/transcriptions:/app/transcriptions
       - C:/workspace/waltham-comments/data:/app/data
       - C:/workspace/waltham-comments/models:/app/models
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
   web:
     build:
       context: ./webapp
