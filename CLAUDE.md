@@ -9,7 +9,7 @@ Four containerized services, orchestrated by `compose.yml`:
 | Service | Directory | Purpose |
 |---|---|---|
 | Meeting Downloader | `meeting-downloader/` | Polls Telvue API, downloads HLS video streams, extracts audio |
-| Transcription | `transcription-service/` | Transcribes + diarizes WAV files with WhisperX (requires GPU) |
+| Transcription | `transcription-service/` | Transcribes + diarizes WAV files with WhisperX |
 | Web App | `waltham-comments-page/` | FastAPI backend + React frontend for viewing meetings |
 | Embeddings | `embeddings-service/` | HTTP API for sentence embeddings (future semantic search) |
 
@@ -18,7 +18,7 @@ Services communicate via shared Docker volumes — no message queues. Data flows
 ## Running the Project
 
 ```bash
-# Start all services (requires GPU with CUDA 12.8+ for transcription)
+# Start all services
 docker compose up --build
 
 # Web UI:       http://localhost:8000
@@ -29,7 +29,7 @@ Requires a `.env` file with:
 - `HF_TOKEN` — Hugging Face token (required for WhisperX diarization model)
 - `DATA_DIR` — root data directory (mapped to `/app` in containers)
 
-Optional env vars: `POLL_INTERVAL_SECONDS` (default 3600), `MIN_SPEAKERS` (default 5), `MAX_SPEAKERS` (default 18), `MODELS_DIR` (default `models`).
+Optional env vars: `POLL_INTERVAL_SECONDS` (default 3600), `MIN_SPEAKERS` (default 5), `MAX_SPEAKERS` (default 18), `MODELS_DIR` (default `models`), `CPU_THREADS` (default 0 = all cores).
 
 ## Development
 
@@ -44,7 +44,7 @@ uv run pytest     # run tests
 
 **Python version:** 3.13 (see `.python-version`).
 
-**PyTorch:** installed from the `pytorch-cu128` index (`https://download.pytorch.org/whl/cu128`), not PyPI. Keep this source when adding or updating torch-related deps.
+**PyTorch:** installed from PyPI (CPU build). No custom index is needed.
 
 ## Key Files
 
