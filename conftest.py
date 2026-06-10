@@ -1,0 +1,6 @@
+import sys
+import os
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "meeting-downloader"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "embeddings-service"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "transcription-service"))

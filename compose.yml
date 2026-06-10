@@ -1,0 +1,51 @@
+name: waltham-comments
+services:
+  embeddings-service:
+    build:
+      context: .
+      dockerfile: embeddings-service/Dockerfile
+    image: embeddings-service
+    ports:
+      - "8001:8001"
+    volumes:
+      - C:/workspace/waltham-comments/models:/app/models
+  meeting-downloader:
+    build:
+      context: .
+      dockerfile: meeting-downloader/Dockerfile
+    image: meeting-downloader
+    volumes:
+      - C:/workspace/waltham-comments/videos:/app/videos
+      - C:/workspace/waltham-comments/audio:/app/audio
+  transcription-service:
+    build:
+      context: .
+      dockerfile: transcription-service/Dockerfile
+    image: transcription-service
+    env_file:
+      - .env
+    volumes:
+      - C:/workspace/waltham-comments/audio:/app/audio
+      - C:/workspace/waltham-comments/transcriptions:/app/transcriptions
+      - C:/workspace/waltham-comments/data:/app/data
+      - C:/workspace/waltham-comments/models:/app/models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+  web:
+    build:
+      context: ./webapp
+      dockerfile: ./Dockerfile
+    image: comments-web
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - C:/workspace/waltham-comments/videos:/app/videos
+      - C:/workspace/waltham-comments/transcriptions:/app/transcriptions
+      - C:/workspace/waltham-comments/data:/app/data

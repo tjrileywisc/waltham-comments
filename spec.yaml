@@ -1,0 +1,118 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: waltham-comments-deployment
+  labels:
+    app: waltham-comments
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+        app: waltham-comments
+  template:
+    metadata:
+      labels:
+        app: waltham-comments
+    spec:
+      containers:
+      - name: embeddings-service
+        image: docker.io/library/embeddings-service:latest
+        imagePullPolicy: Never
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "1000m"
+        volumeMounts:
+        - name: models
+          mountPath: /app/models
+
+      - name: meeting-downloader
+        image: docker.io/library/meeting-downloader:latest
+        imagePullPolicy: Never
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "1000m"
+        volumeMounts:
+        - name: videos
+          mountPath: /app/videos
+        - name: audio
+          mountPath: /app/audio
+
+      - name: transcription-service
+        image: docker.io/library/transcription-service:latest
+        imagePullPolicy: Never
+        envFrom:
+        - secretRef:
+            name: waltham-comments-env
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "1000m"
+        volumeMounts:
+        - name: transcriptions
+          mountPath: /app/transcriptions
+        - name: data
+          mountPath: /app/data
+        - name: audio
+          mountPath: /app/audio
+        - name: models
+          mountPath: /app/models
+
+      - name: web
+        image: docker.io/library/comments-web:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8000
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "1000m"
+        volumeMounts:
+        - name: data
+          mountPath: /app/data
+        - name: videos
+          mountPath: /app/videos
+        - name: transcriptions
+          mountPath: /app/transcriptions
+
+      volumes:
+      - name: models
+        hostPath:
+          path: /host/models
+      - name: videos
+        hostPath:
+          path: /host/videos
+      - name: audio
+        hostPath:
+          path: /host/audio
+      - name: transcriptions
+        hostPath:
+          path: /host/transcriptions
+      - name: data
+        hostPath:
+          path: /host/data
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: waltham-comments-service
+spec:
+  type: NodePort
+  selector:
+    app: waltham-comments
+  ports:
+    - port: 8000
+      targetPort: 8000

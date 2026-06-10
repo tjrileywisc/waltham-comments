@@ -1,0 +1,23 @@
+{
+  "name": "waltham-comments-page",
+  "version": "1.0.0",
+  "description": "site to review city council meeting commentary",
+  "license": "ISC",
+  "author": "Timothy Riley",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "react-router-dom": "^7.13.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^4.0.0",
+    "vite": "^6.0.0"
+  }
+}

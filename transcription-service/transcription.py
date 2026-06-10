@@ -1,20 +1,33 @@
-from . import HF_TOKEN, MIN_SPEAKERS, MAX_SPEAKERS, MODELS_DIR, TEXT, SPEAKER
-from .utils import make_tensorboard_writer
-
-from .identification import Identifier
-
 import os
+from identification import Identifier
+
 import pandas as pd
 import whisperx
 from whisperx.diarize import DiarizationPipeline
+
+from monitoring import setup_logging
+
+logger = setup_logging("transcription")
 
 # ref. https://github.com/m-bain/whisperX/issues/1304
 # a warning displays due to a potential security issue loading weights-only checkpoints
 os.environ["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] = "1"
 
+HF_TOKEN = os.environ.get("HF_TOKEN", "")
+
+# a small committee meeting
+MIN_SPEAKERS = int(os.environ.get("MIN_SPEAKERS", 5))
+
+# 15 city council members, the clerk, the mayor, and 1 extra for unidentified speakers
+MAX_SPEAKERS = int(os.environ.get("MAX_SPEAKERS", 18))
+
+MODELS_DIR = os.environ.get("MODELS_DIR", "models")
+TEXT = "text"
+SPEAKER = "speaker"
+
 DEVICE = "cuda"
 
-BATCH_SIZE = 16 # reduce if low on GPU mem
+BATCH_SIZE = 8 # reduce if low on GPU mem
 COMPUTE_TYPE = "float16" # change to "int8" if low on GPU mem (may reduce accuracy)
 
 def transcription(meeting_name: str):
@@ -31,26 +44,21 @@ def transcription(meeting_name: str):
 
     model = whisperx.load_model("large-v2", DEVICE, compute_type=COMPUTE_TYPE, language="en", download_root=MODELS_DIR)
 
-
-    # save model to local path (optional)
-    # model_dir = "/path/"
-    # model = whisperx.load_model("large-v2", device, compute_type=compute_type, download_root=model_dir)
-
     audio = whisperx.load_audio(audio_file)
     result = model.transcribe(audio, batch_size=BATCH_SIZE)
 
     # delete model if low on GPU resources
-    # import gc; import torch; gc.collect(); torch.cuda.empty_cache(); del model
+    import gc; import torch; gc.collect(); torch.cuda.empty_cache(); del model
 
-    # 2. Align whisper output
+    logger.info("Aligning whisper output")
     model_a, metadata = whisperx.load_align_model(language_code=result["language"], device=DEVICE)
     result = whisperx.align(result["segments"], model_a, metadata, audio, DEVICE, return_char_alignments=False)
 
     # delete model if low on GPU resources
-    # import gc; import torch; gc.collect(); torch.cuda.empty_cache(); del model_a
+    import gc; import torch; gc.collect(); torch.cuda.empty_cache(); del model_a
 
-    # 3. Assign speaker labels
-    diarize_model = DiarizationPipeline(use_auth_token=HF_TOKEN, device=DEVICE)
+    logger.info("Assiging speaker labels")
+    diarize_model = DiarizationPipeline(token=HF_TOKEN, device=DEVICE)
 
     # add min/max number of speakers if known
     diarize_segments, speaker_embeddings = diarize_model(
@@ -67,12 +75,15 @@ def transcription(meeting_name: str):
     # with public comment as that will generate a lot of new speakers.
 
     new_speaker_ids = None
-    if not os.path.exists(Identifier.DB_PATH):
-        Identifier.save_db(speaker_embeddings)
-    else:
-        # load the speaker embeddings database and try to match our current vectors against it
-        identifier = Identifier()
-        new_speaker_ids = identifier(speaker_embeddings)
+    if speaker_embeddings:
+        if not os.path.exists(Identifier.DB_PATH):
+            logger.info("Generating speaker database")
+            Identifier.save_db(speaker_embeddings)
+        else:
+            # load the speaker embeddings database and try to match our current vectors against it
+            logger.info("Matching identifying existing speakers")
+            identifier = Identifier()
+            new_speaker_ids = identifier(speaker_embeddings)
 
     # cleanup
 

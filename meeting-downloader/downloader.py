@@ -1,20 +1,20 @@
-
 import subprocess
 import logging
 import json
 import os
+import re
 import requests
 import yaml
 import time
 import shutil
-from urllib.parse import unquote
 
-from .publicmeeting import PublicMeeting
+from urllib3.util.retry import Retry
+from requests.adapters import HTTPAdapter
+from monitoring import setup_logging
+from publicmeeting import PublicMeeting
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 from tqdm import tqdm
-
-from typing import Dict, List
 
 WCAC_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -26,38 +26,49 @@ WCAC_HEADERS = {
     "Origin": "https://videoplayer.telvue.com"
 }
 
-
+logger = setup_logging("downloader")
 class MeetingDownloader:
     def __init__(self):
         settings = yaml.safe_load(open('settings.yaml', 'r'))
         self.url = settings['telvue_url']
         self.player_id = settings['player_id']
         self.playlists = settings['playlists']
+        
+        retry_strategy = Retry(
+            total=5,
+            backoff_factor=1.0,
+            status_forcelist=[429, 502, 503, 504],
+            raise_on_status=False
+        )
+
+        adapter = HTTPAdapter(max_retries=retry_strategy)
 
         self.session = requests.Session()
+        self.session.mount("https://", adapter)
+        self.session.mount("http://", adapter)
         self.session.headers.update(WCAC_HEADERS)
 
-    def get_new_public_meetings(self, playlists: List | None) -> List[str]:
+    def get_new_public_meetings(self, playlists: list[str] | None) -> list[str]:
         """Queries the WCAC site for new meetings
 
         Args:
-            playlists (List | None): A list of playlist names to filter on. If None, all playlists are checked.
+            playlists (list | None): A list of playlist names to filter on. If None, all playlists are checked.
 
         Returns:
-            List: a list of PublicMeeting objects
+            list: a list of PublicMeeting objects
         """
         public_meetings = []
-        
+
         if playlists is not None:
             # filter
             self.playlists = {k: v for k, v in self.playlists.items() if k in playlists}
 
         for org_name, playlist_id in self.playlists.items():
-            
+
             self.session.headers.update({
                 "Referer": f"https://videoplayer.telvue.com/player/{self.player_id}/playlists/{playlist_id}"
             })
-            
+
             time.sleep(2)   # add delay to mimic human browsing behavior
             res = self.session.get(
                 "{}/{}/playlists/{}".format(self.url, self.player_id, playlist_id)
@@ -69,7 +80,7 @@ class MeetingDownloader:
                 tag = meeting.find_next("a")
                 if not tag:
                     continue
-                
+
                 if 'href' not in tag.attrs:
                     continue
 
@@ -81,8 +92,16 @@ class MeetingDownloader:
                     continue
 
                 meeting_name = tag.string
-                
-                if meeting_name is None or PublicMeeting.meeting_exists(meeting_name):
+
+                if meeting_name is None:
+                    logging.warning(f"unable to parse '{tag}' for a meeeting name")
+                    continue
+                elif PublicMeeting.meeting_exists(meeting_name):
+                    logging.info(f"skipping {meeting_name}, already downloaded")
+                    continue
+                elif not re.search(r"(?<=\s)\d{1,2}-\d{1,2}-\d{2,}$", meeting_name):
+                    # expecting 'test meeting 2-2-01', never with a date at the start of the line
+                    logging.warning(f"skipping '{meeting_name}', which doesn't have a recognized date format")
                     continue
 
                 public_meetings.insert(n, PublicMeeting(video_id, meeting_name, self.playlists[org_name]))
@@ -105,7 +124,7 @@ class MeetingDownloader:
         """
 
         page_url = f"{self.url}/{self.player_id}/media/{meeting.video_id}"
-        
+
         m3u8_url = None
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
@@ -117,8 +136,8 @@ class MeetingDownloader:
 
                 if "master.m3u8" in url and m3u8_url is None:
                     m3u8_url = url.replace("master.m3u8", "index-savc_1000k-v1-a1.m3u8")
-                    logging.info(f"Captured: {m3u8_url}")
-                
+                    logger.info(f"Captured: {m3u8_url}")
+
                 route.abort()  # abort everything - master, variants, segments
 
             page.route("**/*.m3u8", handle_route)
@@ -134,11 +153,11 @@ class MeetingDownloader:
             browser.close()
 
         if not m3u8_url:
-            logging.error(f"No playlist URL found for meeting {meeting.name}")
+            logger.error(f"No playlist URL found for meeting {meeting.name}")
             return None
 
         return m3u8_url
-    
+
     def _get_file_duration(self, filepath: str) -> float:
         """Get the duration of the actually downloaded file.
 
@@ -158,6 +177,16 @@ class MeetingDownloader:
         result = subprocess.run(cmd, capture_output=True, text=True)
         data = json.loads(result.stdout)
         return float(data["format"]["duration"])
+    
+    def _cleanup(self, ts_dir: str) -> None:
+        """Clean up the temporary download directory
+
+        Args:
+            ts_dir (str): the path to the temp segments directory for the video
+        """
+        
+        # clean up temp segments
+        shutil.rmtree(ts_dir, ignore_errors=True)
 
     def download_meeting(self, download_url: str, meeting_name: str):
         """Download a meeting from the site.
@@ -170,7 +199,7 @@ class MeetingDownloader:
         os.makedirs("videos", exist_ok=True)
 
         if os.path.exists(output_file):
-            logging.info(f"Meeting {meeting_name} already downloaded.")
+            logger.info(f"Meeting {meeting_name} already downloaded.")
             return
 
         # get the playlist
@@ -194,41 +223,44 @@ class MeetingDownloader:
         ts_dir = f"videos/.tmp_{meeting_name}"
         os.makedirs(ts_dir, exist_ok=True)
 
-        pbar = tqdm(total=total_duration, unit="s", desc=meeting_name)
-        for i, (seg_url, duration) in enumerate(segments):
-            seg_file = os.path.join(ts_dir, f"seg-{i:04d}.ts")
-            if not os.path.exists(seg_file):
-                time.sleep(0.1)  # small delay between requests
-                seg_resp = self.session.get(seg_url)
-                if seg_resp.status_code != 200:
-                    logging.error(f"Segment {i} returned {seg_resp.status_code}")
-                    return
-                with open(seg_file, "wb") as f:
-                    f.write(seg_resp.content)
-            pbar.update(duration)
-        pbar.close()
+        try:
+            pbar = tqdm(total=total_duration, unit="s", desc=meeting_name)
+            for i, (seg_url, duration) in enumerate(segments):
+                seg_file = os.path.join(ts_dir, f"seg-{i:04d}.ts")
+                if not os.path.exists(seg_file):
+                    time.sleep(0.1)  # small delay between requests
+                    seg_resp = self.session.get(seg_url)
+                    if seg_resp.status_code >= 400:
+                        logger.error(f"Segment {i} returned {seg_resp.status_code}")
+                        return
+                    with open(seg_file, "wb") as f:
+                        f.write(seg_resp.content)
+                pbar.update(duration)
+            pbar.close()
 
-        # write concat file for ffmpeg
-        concat_file = os.path.join(ts_dir, "concat.txt")
-        with open(concat_file, "w") as f:
-            for i in range(len(segments)):
-                f.write(f"file '{os.path.abspath(os.path.join(ts_dir, f'seg-{i:04d}.ts'))}'\n")
+            # write concat file for ffmpeg
+            concat_file = os.path.join(ts_dir, "concat.txt")
+            with open(concat_file, "w") as f:
+                for i in range(len(segments)):
+                    f.write(f"file '{os.path.abspath(os.path.join(ts_dir, f'seg-{i:04d}.ts'))}'\n")
 
-        # mux with ffmpeg locally - no network calls
-        cmd = [
-            "ffmpeg", "-y",
-            "-f", "concat",
-            "-safe", "0",
-            "-i", concat_file,
-            "-c", "copy",
-            output_file
-        ]
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode != 0:
-            logging.error(f"ffmpeg mux failed: {result.stderr[-500:]}")
-            return
+            # mux with ffmpeg locally - no network calls
+            cmd = [
+                "ffmpeg", "-y",
+                "-f", "concat",
+                "-safe", "0",
+                "-i", concat_file,
+                "-c", "copy",
+                output_file
+            ]
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                logger.error(f"ffmpeg mux failed: {result.stderr[-500:]}")
+                return
 
-        logging.info(f"Downloaded {meeting_name} ({total_duration:.0f}s)")
+            logger.info(f"Downloaded {meeting_name} ({total_duration:.0f}s)")
+        except Exception as e:
+            logger.warning(f"Failed to download {meeting_name}: {e}")
+        finally:
+            self._cleanup(ts_dir)
 
-        # clean up temp segments
-        shutil.rmtree(ts_dir, ignore_errors=True)
