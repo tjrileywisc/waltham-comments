@@ -1,7 +1,21 @@
 $ErrorActionPreference = "Stop"
 $root = $PSScriptRoot
 
-docker build -f "$root\transcription-service\Dockerfile" -t waltham-comments/transcription-service "$root"
-docker build -f "$root\meeting-downloader\Dockerfile" -t waltham-comments/meeting-downloader "$root"
-docker build -f "$root\embeddings-service\Dockerfile" -t waltham-comments/embeddings-service "$root"
-docker build -f "$root\webapp\Dockerfile" -t waltham-comments/web "$root\webapp"
+$images = @(
+    @{ tag = "transcription-service"; dockerfile = "$root\transcription-service\Dockerfile"; context = $root },
+    @{ tag = "meeting-downloader";    dockerfile = "$root\meeting-downloader\Dockerfile";    context = $root },
+    @{ tag = "embeddings-service";    dockerfile = "$root\embeddings-service\Dockerfile";    context = $root },
+    @{ tag = "comments-web";          dockerfile = "$root\webapp\Dockerfile";                context = "$root\webapp" }
+)
+
+foreach ($image in $images) {
+    Write-Host "Building $($image.tag)..."
+    docker build -f $image.dockerfile -t $image.tag $image.context
+    if ($LASTEXITCODE -ne 0) { throw "docker build failed for $($image.tag)" }
+
+    Write-Host "Loading $($image.tag) into minikube..."
+    $tar = "$env:TEMP\$($image.tag).tar"
+    docker save $image.tag -o $tar
+    minikube image load $tar --overwrite=true
+    Remove-Item $tar
+}
