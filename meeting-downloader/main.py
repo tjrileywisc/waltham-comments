@@ -22,7 +22,7 @@ def main():
     downloader = MeetingDownloader()
     while True:
         logger.info("Checking for new meetings...")
-        meetings = downloader.get_new_public_meetings(None)
+        meetings = downloader.get_new_public_meetings(PLAYLISTS)
         for meeting in meetings:
             url = downloader.get_download_url(meeting)
             if url:

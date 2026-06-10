@@ -2,6 +2,7 @@ import subprocess
 import logging
 import json
 import os
+import re
 import requests
 import yaml
 import time
@@ -14,8 +15,6 @@ from publicmeeting import PublicMeeting
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 from tqdm import tqdm
-
-from typing import Dict, List
 
 WCAC_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -49,14 +48,14 @@ class MeetingDownloader:
         self.session.mount("http://", adapter)
         self.session.headers.update(WCAC_HEADERS)
 
-    def get_new_public_meetings(self, playlists: List | None) -> List[str]:
+    def get_new_public_meetings(self, playlists: list[str] | None) -> list[str]:
         """Queries the WCAC site for new meetings
 
         Args:
-            playlists (List | None): A list of playlist names to filter on. If None, all playlists are checked.
+            playlists (list | None): A list of playlist names to filter on. If None, all playlists are checked.
 
         Returns:
-            List: a list of PublicMeeting objects
+            list: a list of PublicMeeting objects
         """
         public_meetings = []
 
@@ -94,7 +93,15 @@ class MeetingDownloader:
 
                 meeting_name = tag.string
 
-                if meeting_name is None or PublicMeeting.meeting_exists(meeting_name):
+                if meeting_name is None:
+                    logging.warning(f"unable to parse '{tag}' for a meeeting name")
+                    continue
+                elif PublicMeeting.meeting_exists(meeting_name):
+                    logging.info(f"skipping {meeting_name}, already downloaded")
+                    continue
+                elif not re.search(r"(?<=\s)\d{1,2}-\d{1,2}-\d{2,}$", meeting_name):
+                    # expecting 'test meeting 2-2-01', never with a date at the start of the line
+                    logging.warning(f"skipping '{meeting_name}', which doesn't have a recognized date format")
                     continue
 
                 public_meetings.insert(n, PublicMeeting(video_id, meeting_name, self.playlists[org_name]))
