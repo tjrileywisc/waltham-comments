@@ -44,7 +44,7 @@ uv run pytest     # run tests
 
 **Python version:** 3.13 (see `.python-version`).
 
-**PyTorch:** installed from PyPI (CPU build). No custom index is needed.
+**PyTorch (transcription service):** installed from PyPI (CPU build) — no custom index. The root `pyproject.toml` retains the `pytorch-cu128` index for local development.
 
 ## Key Files
 
