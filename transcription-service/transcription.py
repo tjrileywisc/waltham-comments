@@ -61,13 +61,13 @@ def transcription(meeting_name: str):
     audio = whisperx.load_audio(audio_file)
     result = model.transcribe(audio, batch_size=BATCH_SIZE)
 
-    gc.collect(); del model
+    del model; gc.collect()
 
     logger.info("Aligning whisper output")
     model_a, metadata = whisperx.load_align_model(language_code=result["language"], device=DEVICE)
     result = whisperx.align(result["segments"], model_a, metadata, audio, DEVICE, return_char_alignments=False)
 
-    gc.collect(); del model_a
+    del model_a; gc.collect()
 
     logger.info("Assigning speaker labels")
     diarize_model = DiarizationPipeline(token=HF_TOKEN, device=DEVICE)
