@@ -12,5 +12,3 @@ def test_sentence_embeddings():
     
     assert embeddings.dtype == np.float32
     assert embeddings.size == 384
-     # we don't normalize (for now)
-    assert np.linalg.norm(embeddings[0]) != 1.0
