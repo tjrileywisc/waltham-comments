@@ -6,4 +6,5 @@
 !meeting-downloader/publicmeeting.py
 !meeting-downloader/audio.py
 !monitoring.py
+!log_config.json
 !settings.yaml

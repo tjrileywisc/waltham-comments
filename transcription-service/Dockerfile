@@ -1,4 +1,4 @@
-FROM nvidia/cuda:12.8.1-cudnn-runtime-ubuntu24.04
+FROM ubuntu:24.04
 
 RUN apt update && apt install -y ffmpeg
 
@@ -11,6 +11,6 @@ RUN uv sync --no-dev
 
 COPY transcription-service/main.py transcription-service/transcription.py \
      transcription-service/identification.py .
-COPY monitoring.py .
+COPY monitoring.py log_config.json .
 
 CMD ["uv", "run", "python", "main.py"]

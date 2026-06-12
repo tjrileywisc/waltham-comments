@@ -27,18 +27,18 @@ dependencies = [
 ]
 
 [[tool.uv.index]]
-name = "pytorch-cu128"
-url = "https://download.pytorch.org/whl/cu128"
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
 explicit = true
 
 [tool.uv.sources]
 torch = [
-  {index = "pytorch-cu128"},
+  {index = "pytorch-cpu"},
 ]
 torchvision = [
-  {index = "pytorch-cu128"},
+  {index = "pytorch-cpu"},
 ]
 
 [tool.pytest.ini_options]
-addopts = "--cov=lib --cov-report=term-missing --cov-report=xml:coverage.xml -n auto"
+addopts = "--cov=meeting-downloader --cov=transcription-service --cov=embeddings-service --cov-report=term-missing --cov-report=xml:coverage.xml -n auto"
 testpaths = ["tests"]

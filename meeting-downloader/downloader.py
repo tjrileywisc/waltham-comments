@@ -94,14 +94,14 @@ class MeetingDownloader:
                 meeting_name = tag.string
 
                 if meeting_name is None:
-                    logging.warning(f"unable to parse '{tag}' for a meeeting name")
+                    logger.warning(f"unable to parse '{tag}' for a meeeting name")
                     continue
                 elif PublicMeeting.meeting_exists(meeting_name):
-                    logging.info(f"skipping {meeting_name}, already downloaded")
+                    logger.info(f"skipping {meeting_name}, already downloaded")
                     continue
                 elif not re.search(r"(?<=\s)\d{1,2}-\d{1,2}-\d{2,}$", meeting_name):
                     # expecting 'test meeting 2-2-01', never with a date at the start of the line
-                    logging.warning(f"skipping '{meeting_name}', which doesn't have a recognized date format")
+                    logger.warning(f"skipping '{meeting_name}', which doesn't have a recognized date format")
                     continue
 
                 public_meetings.insert(n, PublicMeeting(video_id, meeting_name, self.playlists[org_name]))

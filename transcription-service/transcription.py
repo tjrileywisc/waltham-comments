@@ -1,7 +1,9 @@
+import gc
 import os
 from identification import Identifier
 
 import pandas as pd
+import torch
 import whisperx
 from whisperx.diarize import DiarizationPipeline
 
@@ -10,25 +12,30 @@ from monitoring import setup_logging
 logger = setup_logging("transcription")
 
 # ref. https://github.com/m-bain/whisperX/issues/1304
-# a warning displays due to a potential security issue loading weights-only checkpoints
 os.environ["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] = "1"
 
 HF_TOKEN = os.environ.get("HF_TOKEN", "")
 
-# a small committee meeting
 MIN_SPEAKERS = int(os.environ.get("MIN_SPEAKERS", 5))
-
-# 15 city council members, the clerk, the mayor, and 1 extra for unidentified speakers
 MAX_SPEAKERS = int(os.environ.get("MAX_SPEAKERS", 18))
 
 MODELS_DIR = os.environ.get("MODELS_DIR", "models")
+
+# 0 means "use all available cores" in CTranslate2
+CPU_THREADS = int(os.environ.get("CPU_THREADS", 0))
+
+# Apply thread count to PyTorch (covers alignment model and diarization pipeline).
+# Only set when explicitly configured — PyTorch's default (all cores) matches
+# CTranslate2's default of 0.
+if CPU_THREADS > 0:
+    torch.set_num_threads(CPU_THREADS)
+
 TEXT = "text"
 SPEAKER = "speaker"
 
-DEVICE = "cuda"
-
-BATCH_SIZE = 8 # reduce if low on GPU mem
-COMPUTE_TYPE = "float16" # change to "int8" if low on GPU mem (may reduce accuracy)
+DEVICE = "cpu"
+BATCH_SIZE = 1
+COMPUTE_TYPE = "int8"
 
 def transcription(meeting_name: str):
     """Diarizes and transcripts a meeting
@@ -42,25 +49,28 @@ def transcription(meeting_name: str):
     os.makedirs("transcriptions", exist_ok=True)
     os.makedirs(MODELS_DIR, exist_ok=True)
 
-    model = whisperx.load_model("large-v2", DEVICE, compute_type=COMPUTE_TYPE, language="en", download_root=MODELS_DIR)
+    model = whisperx.load_model(
+        "large-v2",
+        DEVICE,
+        compute_type=COMPUTE_TYPE,
+        language="en",
+        download_root=MODELS_DIR
+    )
 
     audio = whisperx.load_audio(audio_file)
     result = model.transcribe(audio, batch_size=BATCH_SIZE)
 
-    # delete model if low on GPU resources
-    import gc; import torch; gc.collect(); torch.cuda.empty_cache(); del model
+    del model; gc.collect()
 
     logger.info("Aligning whisper output")
     model_a, metadata = whisperx.load_align_model(language_code=result["language"], device=DEVICE)
     result = whisperx.align(result["segments"], model_a, metadata, audio, DEVICE, return_char_alignments=False)
 
-    # delete model if low on GPU resources
-    import gc; import torch; gc.collect(); torch.cuda.empty_cache(); del model_a
+    del model_a; gc.collect()
 
-    logger.info("Assiging speaker labels")
+    logger.info("Assigning speaker labels")
     diarize_model = DiarizationPipeline(token=HF_TOKEN, device=DEVICE)
 
-    # add min/max number of speakers if known
     diarize_segments, speaker_embeddings = diarize_model(
         audio,
         min_speakers=MIN_SPEAKERS,
@@ -70,32 +80,23 @@ def transcription(meeting_name: str):
 
     result = whisperx.assign_word_speakers(diarize_segments, result)
 
-    # the speaker embeddings are used to match speakers between transcription runs; we want to be careful not
-    # to overwrite it. it should be a database that is 'typical' for a meeting, i.e. best not to choose a meeting
-    # with public comment as that will generate a lot of new speakers.
-
     new_speaker_ids = None
     if speaker_embeddings:
         if not os.path.exists(Identifier.DB_PATH):
             logger.info("Generating speaker database")
             Identifier.save_db(speaker_embeddings)
         else:
-            # load the speaker embeddings database and try to match our current vectors against it
             logger.info("Matching identifying existing speakers")
             identifier = Identifier()
             new_speaker_ids = identifier(speaker_embeddings)
 
-    # cleanup
-
-    # we don't need the 'words' array for each segment
     for segment in result["segments"]:
         segment.pop("words", None)
 
         if new_speaker_ids:
-            # for example, SPEAKER_00
+            # TODO: determine why this might happen, seems to have something to do
+            # with the model (it happens on large-v2 but not base)
             if not SPEAKER in segment:
-                # TODO: determine why this might happen, seems to have something to do
-                # with the model (it happens on large-v2 but not base)
                 segment[SPEAKER] = Identifier.DEFAULT_SPEAKER
                 continue
 
@@ -105,7 +106,6 @@ def transcription(meeting_name: str):
             segment[SPEAKER] = new_speaker_id
 
     df = pd.DataFrame(result["segments"])
-
     df.to_csv(f"transcriptions/{meeting_name}.csv", index_label="id")
 
 if __name__ == "__main__":

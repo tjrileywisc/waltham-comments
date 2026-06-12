@@ -1,4 +1,7 @@
 
+minikube start
+kubectl config use-context minikube
+
 :: secrets in env file
 kubectl create secret generic waltham-comments-env --from-env-file=.env
 

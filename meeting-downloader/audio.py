@@ -1,7 +1,10 @@
 
 import os
 import subprocess
-import logging
+
+from monitoring import setup_logging
+
+logger = setup_logging("downloader")
 
 def extract_audio(meeting_name: str):
     """Extract the audio from an mp4 meeting to wav
@@ -16,10 +19,10 @@ def extract_audio(meeting_name: str):
     
     os.makedirs("audio", exist_ok=True)
     if os.path.exists(output_file):
-        logging.info(f"Audio for {meeting_name} already extracted.")
+        logger.info(f"Audio for {meeting_name} already extracted.")
         return
 
-    logging.info(f"Extracting audio for {meeting_name}")
+    logger.info(f"Extracting audio for {meeting_name}")
 
     cmd = [
         "ffmpeg",

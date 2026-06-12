@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Request, logger
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, StreamingResponse
@@ -6,12 +6,15 @@ from fastapi.responses import FileResponse, StreamingResponse
 import os
 import csv
 from lib.search import do_search
+from monitoring import setup_logging
 from pathlib import Path
 from contextlib import asynccontextmanager
 
+logger = setup_logging("webapp")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.logger.info("Startup; initializing resources.")
+    logger.info("Startup; initializing resources.")
 
     global VIDEO_DB
     files = os.listdir(os.environ["DATA_DIR"] + "/videos")
@@ -52,7 +55,7 @@ def get_transcript(video_id: int):
     path = Path(f"{os.environ['DATA_DIR']}/transcriptions/{name}.csv")
     
     if not path.exists():
-        logger.logger.error(f"can't find {path}")
+        logger.error(f"can't find {path}")
         raise HTTPException(404)
     
     with open(path, newline="") as f:
