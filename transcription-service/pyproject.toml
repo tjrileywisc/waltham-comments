@@ -6,6 +6,8 @@ requires-python = "==3.13.*"
 dependencies = [
     "huggingface-hub>=0.36.0",
     "pandas>=2.0.0",
+    "psycopg[binary]>=3.2.0",
+    "requests>=2.32.0",
     "scikit-learn>=1.0.0",
     "tensorboard>=2.20.0",
     "torch>=2.8.0",
