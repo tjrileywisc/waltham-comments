@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "transcription-servic
 from db import build_window_text
 
 EMBEDDINGS_SERVICE_URL = os.environ.get("EMBEDDINGS_SERVICE_URL", "http://localhost:8001")
-DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://waltham:waltham_dev@localhost:5432/waltham")
+DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://waltham:waltham_dev@localhost:5444/waltham")
 
 
 def migrate_directory(transcriptions_dir: str) -> None:

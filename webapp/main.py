@@ -112,7 +112,11 @@ def about():
 
 @app.get("/api/search")
 def search(query: str):
-    return do_search(query)
+    results = do_search(query)
+    name_to_id = {v["name"]: v["video_id"] for v in VIDEO_DB}
+    for r in results:
+        r["video_id"] = name_to_id.get(r["meeting_name"])
+    return results
 
 
 @app.get("/{full_path:path}")
