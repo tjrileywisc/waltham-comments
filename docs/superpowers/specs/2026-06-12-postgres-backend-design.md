@@ -145,14 +145,14 @@ Existing CSV files in `transcriptions/` will be imported by a one-time script (`
 4. Calls the embeddings service to generate vectors.
 5. Inserts into `utterance_embeddings`.
 
-The script is run manually (outside Docker) after the postgres container is up. CSV files are not deleted automatically — the operator removes them once migration is confirmed.
+The script is run manually after the stack is up. It connects to postgres via `DATABASE_URL` (pointing at `localhost:5432`, so the postgres container must expose that port in `compose.yml`) and to the embeddings service at `EMBEDDINGS_SERVICE_URL` (default `http://localhost:8001`). CSV files are not deleted automatically — the operator removes them once migration is confirmed.
 
 ---
 
 ## Error handling
 
 - **DB connection failure at startup (webapp):** the FastAPI lifespan hook attempts a connection; if it fails the app exits with a logged error rather than starting in a degraded state.
-- **Embeddings service unreachable (transcription service):** logged as an error; the utterances are committed to the DB but the meeting is flagged with no embeddings. Embeddings can be back-filled by re-running the migration script against the already-inserted utterances.
+- **Embeddings service unreachable (transcription service):** logged as an error; the utterances are committed to the DB but no rows are written to `utterance_embeddings` for that meeting — it will simply return no search results until embeddings are back-filled. Back-fill by running the migration script, which skips utterances that already have an embedding row.
 - **Duplicate meeting:** the `UNIQUE (meeting_name, segment_index)` constraint prevents double-processing; the transcription service catches the conflict and logs a warning rather than crashing.
 
 ---
