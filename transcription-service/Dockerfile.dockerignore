@@ -5,3 +5,4 @@
 !transcription-service/transcription.py
 !transcription-service/identification.py
 !monitoring.py
+!log_config.json

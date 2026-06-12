@@ -31,8 +31,8 @@ services:
       - C:/workspace/waltham-comments/models:/app/models
   web:
     build:
-      context: ./webapp
-      dockerfile: ./Dockerfile
+      context: .
+      dockerfile: webapp/Dockerfile
     image: comments-web
     env_file:
       - .env

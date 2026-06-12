@@ -1,0 +1,13 @@
+**
+!webapp/pyproject.toml
+!webapp/main.py
+!webapp/lib/
+!webapp/lib/search.py
+!webapp/frontend/index.html
+!webapp/frontend/package.json
+!webapp/frontend/package-lock.json
+!webapp/frontend/vite.config.js
+!webapp/frontend/src/
+!webapp/frontend/src/**
+!monitoring.py
+!log_config.json
