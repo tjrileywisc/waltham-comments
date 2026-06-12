@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, StreamingResponse
 
 import os
-import csv
+from lib.db import connect, get_transcript as db_get_transcript
 from lib.search import do_search
 from monitoring import setup_logging
 from pathlib import Path
@@ -12,9 +12,14 @@ from contextlib import asynccontextmanager
 
 logger = setup_logging("webapp")
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Startup; initializing resources.")
+
+    with connect() as conn:
+        conn.execute("SELECT 1")  # raises on connection failure, preventing startup
+    logger.info("Database connection verified.")
 
     global VIDEO_DB
     files = os.listdir(os.environ["DATA_DIR"] + "/videos")
@@ -24,8 +29,6 @@ async def lifespan(app: FastAPI):
     ]
 
     yield
-    
-    # shutdown
 
 
 app = FastAPI(lifespan=lifespan)
@@ -44,37 +47,26 @@ app.mount(
 
 VIDEO_DB = list()
 
+
 @app.get("/")
 def root():
     return FileResponse("./frontend/dist/index.html")
 
+
 @app.get("/api/transcript/{video_id}")
 def get_transcript(video_id: int):
     name = VIDEO_DB[video_id]["name"]
-    
-    path = Path(f"{os.environ['DATA_DIR']}/transcriptions/{name}.csv")
-    
-    if not path.exists():
-        logger.error(f"can't find {path}")
+    with connect() as conn:
+        rows = db_get_transcript(conn, name)
+    if not rows:
         raise HTTPException(404)
-    
-    with open(path, newline="") as f:
-        reader = csv.DictReader(f)
-        return [
-            {
-                "id": int(row["id"]),
-                "start": float(row["start"]),
-                "end": float(row["end"]),
-                "text": row["text"],
-                "speaker": row["speaker"],
-            }
-            for row in reader
-        ]
+    return rows
+
 
 @app.get("/api/video/{video_id}")
 def get_video(video_id: int, request: Request):
     path = os.environ['DATA_DIR'] + "/videos/" + VIDEO_DB[video_id]["name"] + ".mp4"
-    
+
     video_path = Path(path)
     if not video_path.exists:
         raise HTTPException(404)
@@ -107,22 +99,22 @@ def get_video(video_id: int, request: Request):
         media_type="video/mp4",
     )
 
+
 @app.get("/api/videos")
 def get_videos():
     return VIDEO_DB
+
 
 @app.get("/about")
 def about():
     return FileResponse("./frontend/dist/index.html")
 
-# search functions
 
 @app.get("/api/search")
 def search(query: str):
-    results = do_search(query)
-    return results
+    return do_search(query)
 
-# catch-all route
+
 @app.get("/{full_path:path}")
 def serve_frontend(full_path: str):
     return FileResponse("./frontend/dist/index.html")
