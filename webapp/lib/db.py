@@ -10,7 +10,7 @@ def get_transcript(conn, meeting_name: str) -> list[dict]:
     with conn.cursor() as cur:
         cur.execute(
             """
-            SELECT segment_index, start_time, end_time, text, speaker
+            SELECT id, start_time, end_time, text, speaker
             FROM utterances
             WHERE meeting_name = %s
             ORDER BY segment_index
