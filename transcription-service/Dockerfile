@@ -10,7 +10,7 @@ COPY transcription-service/pyproject.toml .
 RUN uv sync --no-dev
 
 COPY transcription-service/main.py transcription-service/transcription.py \
-     transcription-service/identification.py .
+     transcription-service/identification.py transcription-service/db.py .
 COPY monitoring.py log_config.json .
 
 CMD ["uv", "run", "python", "main.py"]
