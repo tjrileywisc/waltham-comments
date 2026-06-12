@@ -1,5 +1,16 @@
 name: waltham-comments
 services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
   embeddings-service:
     build:
       context: .
@@ -24,9 +35,14 @@ services:
     image: transcription-service
     env_file:
       - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      EMBEDDINGS_SERVICE_URL: http://embeddings-service:8001
+    depends_on:
+      - postgres
+      - embeddings-service
     volumes:
       - C:/workspace/waltham-comments/audio:/app/audio
-      - C:/workspace/waltham-comments/transcriptions:/app/transcriptions
       - C:/workspace/waltham-comments/data:/app/data
       - C:/workspace/waltham-comments/models:/app/models
   web:
@@ -36,9 +52,16 @@ services:
     image: comments-web
     env_file:
       - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      EMBEDDINGS_SERVICE_URL: http://embeddings-service:8001
     ports:
       - "8000:8000"
+    depends_on:
+      - postgres
     volumes:
       - C:/workspace/waltham-comments/videos:/app/videos
-      - C:/workspace/waltham-comments/transcriptions:/app/transcriptions
       - C:/workspace/waltham-comments/data:/app/data
+
+volumes:
+  postgres_data:
