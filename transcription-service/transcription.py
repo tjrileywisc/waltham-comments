@@ -3,7 +3,7 @@ import os
 import psycopg
 
 from identification import Identifier
-from db import save_meeting
+from db import save_meeting, is_meeting_processed
 
 import torch
 import whisperx
@@ -32,6 +32,12 @@ COMPUTE_TYPE = "int8"
 
 
 def transcription(meeting_name: str):
+    
+    with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
+        if is_meeting_processed(conn, meeting_name):
+            logger.info(f"skipping {meeting_name}, already in database")
+            return
+    
     audio_file = f"audio/{meeting_name}.wav"
 
     os.makedirs(MODELS_DIR, exist_ok=True)

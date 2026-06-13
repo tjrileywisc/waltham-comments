@@ -15,6 +15,16 @@ def build_window_text(segments: list[dict], current_idx: int) -> str:
     return " ".join(parts)
 
 
+def is_meeting_processed(conn, meeting_name: str) -> bool:
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT 1 FROM utterances WHERE meeting_name = %s LIMIT 1",
+            (meeting_name,),
+        )
+        return cur.fetchone() is not None
+
+
+
 def save_meeting(conn, meeting_name: str, segments: list[dict]) -> None:
     windowed_texts = [build_window_text(segments, i) for i in range(len(segments))]
 
