@@ -36,11 +36,11 @@ def test_get_transcript_empty_returns_empty_list():
     assert result == []
 
 
-def test_do_search_returns_results(mocker, monkeypatch):
+def test_vector_search_returns_results(mocker, monkeypatch):
     mock_cur = MagicMock()
     mock_cur.fetchall.return_value = [
-        ("City Council 1-12-26", 10.0, "Traffic on Main Street", "SPEAKER_00", 0.91),
-        ("City Council 1-26-26", 45.2, "The traffic light proposal", "SPEAKER_01", 0.87),
+        (0, "City Council 1-12-26", 10.0, "Traffic on Main Street", "SPEAKER_00", 0.91),
+        (1, "City Council 1-26-26", 45.2, "The traffic light proposal", "SPEAKER_01", 0.87),
     ]
     mock_conn = MagicMock()
     mock_conn.cursor.return_value.__enter__ = MagicMock(return_value=mock_cur)
@@ -54,8 +54,8 @@ def test_do_search_returns_results(mocker, monkeypatch):
     mocker.patch("lib.search.psycopg.connect", return_value=mock_conn)
     monkeypatch.setenv("DATABASE_URL", "postgresql://test")
 
-    from lib.search import do_search
-    results = do_search("traffic")
+    from lib.search import vector_search
+    results = vector_search("traffic")
 
     assert len(results) == 2
     assert results[0]["meeting_name"] == "City Council 1-12-26"

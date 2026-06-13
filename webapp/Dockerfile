@@ -9,6 +9,7 @@ WORKDIR /app
 
 COPY webapp/pyproject.toml webapp/main.py log_config.json monitoring.py .
 COPY webapp/lib/ lib/
+COPY migrations/ migrations/
 COPY webapp/frontend/ frontend/
 RUN uv sync --no-dev
 

@@ -4,11 +4,14 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, StreamingResponse
 
 import os
+from contextlib import asynccontextmanager
+from pathlib import Path
+
+from yoyo import get_backend, read_migrations
+
 from lib.db import connect, get_transcript as db_get_transcript
 from lib.search import do_search
 from monitoring import setup_logging
-from pathlib import Path
-from contextlib import asynccontextmanager
 
 logger = setup_logging("webapp")
 
@@ -17,9 +20,12 @@ logger = setup_logging("webapp")
 async def lifespan(app: FastAPI):
     logger.info("Startup; initializing resources.")
 
-    with connect() as conn:
-        conn.execute("SELECT 1")  # raises on connection failure, preventing startup
-    logger.info("Database connection verified.")
+    db_url = os.environ["DATABASE_URL"].replace("postgresql://", "postgresql+psycopg://", 1)
+    backend = get_backend(db_url)
+    migrations = read_migrations("./migrations")
+    with backend.lock():
+        backend.apply_migrations(backend.to_apply(migrations))
+    logger.info("Database migrations applied.")
 
     global VIDEO_DB
     files = os.listdir(os.environ["DATA_DIR"] + "/videos")
@@ -108,6 +114,10 @@ def get_videos():
 @app.get("/about")
 def about():
     return FileResponse("./frontend/dist/index.html")
+
+@app.get("/healthcheck")
+def healthcheck() -> int:
+    return 200
 
 
 @app.get("/api/search")
