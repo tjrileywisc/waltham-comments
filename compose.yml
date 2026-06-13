@@ -39,8 +39,12 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       EMBEDDINGS_SERVICE_URL: http://embeddings-service:8001
     depends_on:
-      - postgres
-      - embeddings-service
+      postgres:
+        condition: service_started
+      embeddings-service:
+        condition: service_started
+      web:
+        condition: service_healthy
     volumes:
       - C:/workspace/waltham-comments/audio:/app/audio
       - C:/workspace/waltham-comments/data:/app/data
@@ -62,6 +66,12 @@ services:
     volumes:
       - C:/workspace/waltham-comments/videos:/app/videos
       - C:/workspace/waltham-comments/data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthcheck')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
 volumes:
   postgres_data:

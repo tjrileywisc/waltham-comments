@@ -10,4 +10,6 @@
 !webapp/frontend/src/
 !webapp/frontend/src/**
 !monitoring.py
+!migrations
 !log_config.json
+
