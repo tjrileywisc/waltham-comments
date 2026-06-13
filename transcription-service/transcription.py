@@ -48,6 +48,7 @@ def transcription(meeting_name: str):
         compute_type=COMPUTE_TYPE,
         language="en",
         download_root=MODELS_DIR,
+        threads=8
     )
 
     audio = whisperx.load_audio(audio_file)
