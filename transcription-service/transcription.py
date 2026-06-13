@@ -1,8 +1,10 @@
 import gc
 import os
-from identification import Identifier
+import psycopg
 
-import pandas as pd
+from identification import Identifier
+from db import save_meeting
+
 import torch
 import whisperx
 from whisperx.diarize import DiarizationPipeline
@@ -11,42 +13,27 @@ from monitoring import setup_logging
 
 logger = setup_logging("transcription")
 
-# ref. https://github.com/m-bain/whisperX/issues/1304
 os.environ["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] = "1"
 
 HF_TOKEN = os.environ.get("HF_TOKEN", "")
-
 MIN_SPEAKERS = int(os.environ.get("MIN_SPEAKERS", 5))
 MAX_SPEAKERS = int(os.environ.get("MAX_SPEAKERS", 18))
-
 MODELS_DIR = os.environ.get("MODELS_DIR", "models")
-
-# 0 means "use all available cores" in CTranslate2
 CPU_THREADS = int(os.environ.get("CPU_THREADS", 0))
 
-# Apply thread count to PyTorch (covers alignment model and diarization pipeline).
-# Only set when explicitly configured — PyTorch's default (all cores) matches
-# CTranslate2's default of 0.
 if CPU_THREADS > 0:
     torch.set_num_threads(CPU_THREADS)
 
 TEXT = "text"
 SPEAKER = "speaker"
-
 DEVICE = "cpu"
 BATCH_SIZE = 1
 COMPUTE_TYPE = "int8"
 
+
 def transcription(meeting_name: str):
-    """Diarizes and transcripts a meeting
-
-    Args:
-        meeting_name (str): the name of the meeting
-    """
-
     audio_file = f"audio/{meeting_name}.wav"
 
-    os.makedirs("transcriptions", exist_ok=True)
     os.makedirs(MODELS_DIR, exist_ok=True)
 
     model = whisperx.load_model(
@@ -54,7 +41,7 @@ def transcription(meeting_name: str):
         DEVICE,
         compute_type=COMPUTE_TYPE,
         language="en",
-        download_root=MODELS_DIR
+        download_root=MODELS_DIR,
     )
 
     audio = whisperx.load_audio(audio_file)
@@ -94,19 +81,17 @@ def transcription(meeting_name: str):
         segment.pop("words", None)
 
         if new_speaker_ids:
-            # TODO: determine why this might happen, seems to have something to do
-            # with the model (it happens on large-v2 but not base)
-            if not SPEAKER in segment:
+            if SPEAKER not in segment:
                 segment[SPEAKER] = Identifier.DEFAULT_SPEAKER
                 continue
-
             old_speaker_id = segment[SPEAKER]
             old_speaker_idx = int(old_speaker_id.split("_")[1])
-            new_speaker_id = new_speaker_ids[old_speaker_idx]
-            segment[SPEAKER] = new_speaker_id
+            segment[SPEAKER] = new_speaker_ids[old_speaker_idx]
 
-    df = pd.DataFrame(result["segments"])
-    df.to_csv(f"transcriptions/{meeting_name}.csv", index_label="id")
+    logger.info("Saving to database")
+    with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
+        save_meeting(conn, meeting_name, result["segments"])
+
 
 if __name__ == "__main__":
     import sys

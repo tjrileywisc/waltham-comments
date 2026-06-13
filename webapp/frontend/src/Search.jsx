@@ -1,5 +1,6 @@
 
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
 function Search() {
 
@@ -18,12 +19,12 @@ function Search() {
         setError(null);
 
         try {
-            const response = await fetch(`/search?q=${encodeURIComponent(query)}`);
+            const response = await fetch(`/api/search?query=${encodeURIComponent(query)}`);
             if (!response.ok) throw new Error("Search failed");
             const data = await response.json();
             setResults(data);
         } catch (err) {
-            setError("Something went wrong. Please try again.");
+            setError(`Something went wrong (${err}). Please try again.`);
         } finally {
             setLoading(false);
         }
@@ -55,8 +56,9 @@ function Search() {
             <ul className="search-results">
                 {results.map((result, i) => (
                     <li key={i} className="search-result">
-                        <a href={`/api/video/${result.video_id}`}>{result.video_title}</a>
-                        <span className="timestamp">@ {formatTimeStamp(result.start)}</span>
+                        <Link to={`/?video=${result.video_id}&t=${Math.max(0, result.start - 5).toFixed(1)}`}>
+                            {result.meeting_name} @ {formatTimeStamp(result.start)}
+                        </Link>
                         <p className="snippet">{result.text}</p>
                     </li>
                 ))}

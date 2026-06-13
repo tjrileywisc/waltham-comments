@@ -1,5 +1,6 @@
 
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import VideoPlayer from "./VideoPlayer";
 import VideoList from "./VideoList";
@@ -8,8 +9,11 @@ import TranscriptDisplay from "./TranscriptDisplay";
 import "./styles.css";
 
 function App() {
+  const [searchParams] = useSearchParams();
+  const initialVideoId = searchParams.get("video") != null ? parseInt(searchParams.get("video")) : null;
+  const startTime = searchParams.get("t") != null ? parseFloat(searchParams.get("t")) : 0;
 
-  const [videoId, setVideoId] = useState(null);
+  const [videoId, setVideoId] = useState(initialVideoId);
   const [currentTime, setCurrentTime] = useState(0);
 
   return (
@@ -17,7 +21,7 @@ function App() {
       <div className="app-container">
 
         <div className="left-pane">
-          <VideoPlayer videoId={videoId} onTimeUpdate={setCurrentTime} />
+          <VideoPlayer videoId={videoId} startTime={startTime} onTimeUpdate={setCurrentTime} />
           <TranscriptDisplay videoId={videoId} currentTime={currentTime} />
         </div>
 
