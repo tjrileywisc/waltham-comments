@@ -64,7 +64,7 @@ def get_transcript(video_id: int):
 
 
 @app.get("/api/video/{video_id}")
-def get_video(video_id: int, request: Request):
+def get_video(video_id: int, request: Request) -> StreamingResponse:
     path = os.environ['DATA_DIR'] + "/videos/" + VIDEO_DB[video_id]["name"] + ".mp4"
 
     video_path = Path(path)
