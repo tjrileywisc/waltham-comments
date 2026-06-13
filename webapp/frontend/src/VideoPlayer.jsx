@@ -1,12 +1,11 @@
 import { useEffect, useRef } from "react";
 
-function VideoPlayer({ videoId, onTimeUpdate }) {
+function VideoPlayer({ videoId, startTime = 0, onTimeUpdate }) {
   const videoRef = useRef(null);
 
   useEffect(() => {
     if (videoId && videoRef.current) {
       videoRef.current.load();
-      videoRef.current.play();
     }
   }, [videoId]);
 
@@ -14,7 +13,12 @@ function VideoPlayer({ videoId, onTimeUpdate }) {
     return <p>Select a video to play</p>;
   }
 
-  const videoSrc = `/api/video/${videoId}`;
+  const handleLoadedMetadata = () => {
+    if (startTime > 0 && videoRef.current) {
+      videoRef.current.currentTime = startTime;
+    }
+    videoRef.current.play();
+  };
 
   return (
     <video
@@ -22,11 +26,10 @@ function VideoPlayer({ videoId, onTimeUpdate }) {
       controls
       width="800"
       height="800"
-      onTimeUpdate={() => {
-        onTimeUpdate(videoRef.current.currentTime);
-      }}
+      onLoadedMetadata={handleLoadedMetadata}
+      onTimeUpdate={() => onTimeUpdate(videoRef.current.currentTime)}
     >
-      <source src={videoSrc} type="video/mp4" />
+      <source src={`/api/video/${videoId}`} type="video/mp4" />
     </video>
   );
 }
