@@ -35,6 +35,7 @@ def test_wont_download_nodate_meetings(mocker):
         ["test meeting", 0],
         ["test meeting 2-2-02", 1],
         ["test meeting 2-2-02 a", 0],
+        ["test meeting 2-2-02 Part 1", 1],
         ["2-2-02", 0]
     ]:
 
