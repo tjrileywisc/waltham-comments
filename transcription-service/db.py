@@ -1,5 +1,6 @@
 import os
 import requests
+import re
 import psycopg
 
 EMBEDDINGS_SERVICE_URL = os.environ.get("EMBEDDINGS_SERVICE_URL", "http://embeddings-service:8001")
@@ -24,19 +25,25 @@ def is_meeting_processed(conn, meeting_name: str) -> bool:
         return cur.fetchone() is not None
 
 
+def extract_meeting_type(meeting_name: str) -> str:
+    # ends with date, and sometimes a part number
+    return re.sub(r" \d{1,2}-\d{1,2}-\d{2,}( Part \d+)?$", "", meeting_name)
+
 
 def save_meeting(conn, meeting_name: str, segments: list[dict]) -> None:
     windowed_texts = [build_window_text(segments, i) for i in range(len(segments))]
 
+    meeting_type = extract_meeting_type(meeting_name)
+
     with conn.cursor() as cur:
         cur.executemany(
             """
-            INSERT INTO utterances (meeting_name, segment_index, start_time, end_time, text, speaker)
-            VALUES (%s, %s, %s, %s, %s, %s)
+            INSERT INTO utterances (meeting_name, meeting_type, segment_index, start_time, end_time, text, speaker)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (meeting_name, segment_index) DO NOTHING
             """,
             [
-                (meeting_name, i, seg["start"], seg["end"], seg["text"], seg.get("speaker", "DEFAULT"))
+                (meeting_name, meeting_type, i, seg["start"], seg["end"], seg["text"], seg.get("speaker", "DEFAULT"))
                 for i, seg in enumerate(segments)
             ],
         )
