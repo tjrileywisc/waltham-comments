@@ -14,6 +14,7 @@ function App() {
   const startTime = searchParams.get("t") != null ? parseFloat(searchParams.get("t")) : 0;
 
   const [videoId, setVideoId] = useState(initialVideoId);
+  const [seekTo, setSeekTo] = useState(null);
   const [currentTime, setCurrentTime] = useState(0);
 
   return (
@@ -21,8 +22,8 @@ function App() {
       <div className="app-container">
 
         <div className="left-pane">
-          <VideoPlayer videoId={videoId} startTime={startTime} onTimeUpdate={setCurrentTime} />
-          <TranscriptDisplay videoId={videoId} currentTime={currentTime} />
+          <VideoPlayer videoId={videoId} startTime={startTime} onTimeUpdate={setCurrentTime} seekTo={seekTo} />
+          <TranscriptDisplay videoId={videoId} currentTime={currentTime} onSeek={setSeekTo} />
         </div>
 
         <div className="right-pane">
