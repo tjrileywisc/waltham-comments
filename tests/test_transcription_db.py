@@ -1,4 +1,5 @@
-from db import build_window_text
+from db import build_window_text, extract_meeting_type, extract_meeting_date, extract_meeting_part, is_meeting_processed, save_meeting
+from unittest.mock import MagicMock
 
 
 def test_build_window_text_includes_preceding_segments_within_window():
@@ -10,7 +11,6 @@ def test_build_window_text_includes_preceding_segments_within_window():
     # window_start = 4.0 - 5.0 = -1.0; all three start times >= -1.0
     assert build_window_text(segments, 2) == "Hello world today"
 
-
 def test_build_window_text_excludes_segments_outside_window():
     segments = [
         {"start": 0.0, "end": 1.0, "text": "Old"},
@@ -20,7 +20,6 @@ def test_build_window_text_excludes_segments_outside_window():
     # window_start = 8.0 - 5.0 = 3.0; "Old" starts at 0.0 < 3.0, excluded
     assert build_window_text(segments, 2) == "Recent Current"
 
-
 def test_build_window_text_long_segment_used_alone():
     segments = [
         {"start": 0.0, "end": 1.0, "text": "Before"},
@@ -29,14 +28,9 @@ def test_build_window_text_long_segment_used_alone():
     # duration 8.0 >= 5.0 — use alone regardless of preceding segments
     assert build_window_text(segments, 1) == "Long segment"
 
-
 def test_build_window_text_first_segment():
     segments = [{"start": 0.0, "end": 2.0, "text": "First"}]
     assert build_window_text(segments, 0) == "First"
-
-
-from unittest.mock import MagicMock
-
 
 def test_save_meeting_inserts_utterances_and_embeddings(mocker):
     segments = [
@@ -54,15 +48,14 @@ def test_save_meeting_inserts_utterances_and_embeddings(mocker):
     mock_resp.json.return_value = {"embeddings": [[0.1] * 384, [0.2] * 384]}
     mocker.patch("db.requests.post", return_value=mock_resp)
 
-    from db import save_meeting
     save_meeting(mock_conn, "Test Meeting 1-1-26", segments)
 
     mock_cur.executemany.assert_called_once()
     insert_sql, rows = mock_cur.executemany.call_args.args
     assert "INSERT INTO utterances" in insert_sql
     assert len(rows) == 2
-    assert rows[0] == ("Test Meeting 1-1-26", 0, 0.0, 2.0, "Hello", "SPEAKER_00")
-    assert rows[1] == ("Test Meeting 1-1-26", 1, 2.5, 4.0, "World", "SPEAKER_01")
+    assert rows[0] == ("Test Meeting 1-1-26", "Test Meeting", 0, 0.0, 2.0, "Hello", "SPEAKER_00")
+    assert rows[1] == ("Test Meeting 1-1-26", "Test Meeting", 1, 2.5, 4.0, "World", "SPEAKER_01")
 
     assert mock_conn.commit.call_count == 2
 
@@ -86,8 +79,62 @@ def test_save_meeting_uses_default_speaker_when_missing(mocker):
     mock_resp.json.return_value = {"embeddings": [[0.0] * 384]}
     mocker.patch("db.requests.post", return_value=mock_resp)
 
-    from db import save_meeting
     save_meeting(mock_conn, "Test Meeting", segments)
 
     _, rows = mock_cur.executemany.call_args.args
-    assert rows[0][5] == "DEFAULT"
+    assert rows[0][6] == "DEFAULT"
+    
+def _make_mock_conn(fetchone_result):
+    mock_cur = MagicMock()
+    mock_cur.fetchone.return_value = fetchone_result
+    mock_conn = MagicMock()
+    mock_conn.cursor.return_value.__enter__ = MagicMock(return_value=mock_cur)
+    mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
+    return mock_conn
+
+
+def test_is_meeting_processed_returns_true_when_present():
+    assert is_meeting_processed(_make_mock_conn(("meeting_name",)), "meeting_name") is True
+
+
+def test_is_meeting_processed_returns_false_when_absent():
+    assert is_meeting_processed(_make_mock_conn(None), "new_meeting") is False
+
+def test_extract_meeting_type_strips_trailing_date():
+    assert extract_meeting_type("City Council 6-13-26") == "City Council"
+
+def test_extract_meeting_type_supports_continued_meetings():
+    assert extract_meeting_type("City Council 6-13-26 Part 2") == "City Council"
+
+def test_extract_meeting_type_strips_four_digit_year():
+    assert extract_meeting_type("Finance Committee 12-31-2024") == "Finance Committee"
+
+def test_extract_meeting_type_strips_single_digit_month_and_day():
+    assert extract_meeting_type("Board Meeting 1-1-26") == "Board Meeting"
+
+def test_extract_meeting_type_no_date_unchanged():
+    assert extract_meeting_type("Special Session") == "Special Session"
+
+def test_extract_meeting_type_date_not_at_end_unchanged():
+    # regex is anchored to $, so a date in the middle is not stripped
+    assert extract_meeting_type("6-13-26 City Council") == "6-13-26 City Council"
+
+def test_extract_meeting_date_no_match():
+    assert extract_meeting_date("City Council") is None
+    
+def test_extract_incomplete_meeting_date():
+    assert extract_meeting_date("City Council 2-26") is None
+    
+def test_extract_meeting_date():
+    meeting_date = extract_meeting_date("City Council 2-22-02")
+    assert meeting_date.month == 2
+    assert meeting_date.day == 22
+    assert meeting_date.year == 2002
+    
+def test_extract_meeting_part():
+    
+    assert extract_meeting_part("City Council") is None
+    assert extract_meeting_part("City Council Part") is None
+    assert extract_meeting_part("City Part 1 Council") is None
+    assert extract_meeting_part("City Council Part 1") == "1"
+    assert extract_meeting_part("City Council 2-2-02 Part 1") == "1"

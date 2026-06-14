@@ -14,6 +14,9 @@ models
 transcriptions
 videos
 
+# scratch area for resyncing db
+update_queries
+
 # Unit test / coverage reports
 .coverage
 coverage.xml

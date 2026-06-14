@@ -99,13 +99,15 @@ class MeetingDownloader:
                 elif PublicMeeting.meeting_exists(meeting_name):
                     logger.info(f"skipping {meeting_name}, already downloaded")
                     continue
-                elif not re.search(r"(?<=\s)\d{1,2}-\d{1,2}-\d{2,}$", meeting_name):
+                elif not re.search(r"(?<=\s)\d{1,2}-\d{1,2}-\d{2,}( Part \d+)?$", meeting_name):
                     # expecting 'test meeting 2-2-01', never with a date at the start of the line
+                    # and sometimes 'Part n' appended to the end
                     logger.warning(f"skipping '{meeting_name}', which doesn't have a recognized date format")
                     continue
 
                 public_meetings.insert(n, PublicMeeting(video_id, meeting_name, self.playlists[org_name]))
 
+            # TODO: someday, just queue this work up
             if len(public_meetings) > 5:
                 break
 
