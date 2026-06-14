@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 
-function VideoPlayer({ videoId, startTime = 0, onTimeUpdate }) {
+function VideoPlayer({ videoId, startTime = 0, onTimeUpdate, seekTo }) {
   const videoRef = useRef(null);
 
   useEffect(() => {
@@ -8,6 +8,12 @@ function VideoPlayer({ videoId, startTime = 0, onTimeUpdate }) {
       videoRef.current.load();
     }
   }, [videoId]);
+
+  useEffect(() => {
+    if (seekTo != null && videoRef.current) {
+      videoRef.current.currentTime = seekTo;
+    }
+  }, [seekTo]);
 
   if (videoId == null) {
     return <p>Select a video to play</p>;
