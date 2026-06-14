@@ -1,4 +1,4 @@
-from db import build_window_text, extract_meeting_type, is_meeting_processed, save_meeting
+from db import build_window_text, extract_meeting_type, extract_meeting_date, extract_meeting_part, is_meeting_processed, save_meeting
 from unittest.mock import MagicMock
 
 
@@ -118,3 +118,23 @@ def test_extract_meeting_type_no_date_unchanged():
 def test_extract_meeting_type_date_not_at_end_unchanged():
     # regex is anchored to $, so a date in the middle is not stripped
     assert extract_meeting_type("6-13-26 City Council") == "6-13-26 City Council"
+
+def test_extract_meeting_date_no_match():
+    assert extract_meeting_date("City Council") is None
+    
+def test_extract_incomplete_meeting_date():
+    assert extract_meeting_date("City Council 2-26") is None
+    
+def test_extract_meeting_date():
+    meeting_date = extract_meeting_date("City Council 2-22-02")
+    assert meeting_date.month == 2
+    assert meeting_date.day == 22
+    assert meeting_date.year == 2002
+    
+def test_extract_meeting_part():
+    
+    assert extract_meeting_part("City Council") is None
+    assert extract_meeting_part("City Council Part") is None
+    assert extract_meeting_part("City Part 1 Council") is None
+    assert extract_meeting_part("City Council Part 1") == "1"
+    assert extract_meeting_part("City Council 2-2-02 Part 1") == "1"
