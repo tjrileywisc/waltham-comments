@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -12,7 +11,6 @@ function Search() {
     const handleSearch = async (e) => {
         e.preventDefault();
 
-        // query is empty
         if (!query.trim()) return;
 
         setLoading(true);
@@ -37,7 +35,7 @@ function Search() {
     };
 
     return (
-        <div className="search-container">
+        <div className="search-page">
             <form onSubmit={handleSearch} className="search-form">
                 <input
                     type="text"
@@ -56,7 +54,7 @@ function Search() {
             <ul className="search-results">
                 {results.map((result, i) => (
                     <li key={i} className="search-result">
-                        <Link to={`/?video=${result.video_id}&t=${Math.max(0, result.start - 5).toFixed(1)}`}>
+                        <Link to={`/videos?video=${result.video_id}&t=${Math.max(0, result.start - 5).toFixed(1)}`}>
                             {result.meeting_name} @ {formatTimeStamp(result.start)}
                         </Link>
                         <p className="snippet">{result.text}</p>
