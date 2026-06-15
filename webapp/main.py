@@ -63,12 +63,6 @@ app.mount(
 
 VIDEO_DB = list()
 
-
-@app.get("/")
-def root():
-    return FileResponse("./frontend/dist/index.html")
-
-
 @app.get("/api/transcript/{video_id}")
 def get_transcript(video_id: int):
     name = VIDEO_DB[video_id]["name"]
