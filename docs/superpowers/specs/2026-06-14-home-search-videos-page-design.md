@@ -47,7 +47,7 @@ Add a rule so `search-container` is vertically centered on the home page:
 }
 ```
 
-Wrap `Search.jsx` root element in this class (or apply it directly to `.search-container` conditionally). Results appear below the centered box once a search runs — the container shifts up naturally as content grows.
+Rename the root `<div className="search-container">` in `Search.jsx` to `<div className="search-page">`. Results appear below the search form; the page scrolls naturally as content grows.
 
 ## Out of Scope
 

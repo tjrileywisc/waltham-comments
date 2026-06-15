@@ -1,7 +1,14 @@
 import { useEffect, useRef } from "react";
 
-function VideoPlayer({ videoId, startTime = 0, onTimeUpdate, seekTo }) {
-  const videoRef = useRef(null);
+type VideoPlayerProps = {
+  videoId: number | null,
+  startTime?: number,
+  onTimeUpdate: (time: number) => void,
+  seekTo: number | null
+};
+
+function VideoPlayer({ videoId, startTime = 0, onTimeUpdate, seekTo } : VideoPlayerProps) {
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     if (videoId && videoRef.current) {
@@ -23,7 +30,7 @@ function VideoPlayer({ videoId, startTime = 0, onTimeUpdate, seekTo }) {
     if (startTime > 0 && videoRef.current) {
       videoRef.current.currentTime = startTime;
     }
-    videoRef.current.play();
+    videoRef.current?.play();
   };
 
   return (
@@ -33,7 +40,7 @@ function VideoPlayer({ videoId, startTime = 0, onTimeUpdate, seekTo }) {
       width="800"
       height="800"
       onLoadedMetadata={handleLoadedMetadata}
-      onTimeUpdate={() => onTimeUpdate(videoRef.current.currentTime)}
+      onTimeUpdate={() => videoRef.current && onTimeUpdate(videoRef.current.currentTime)}
     >
       <source src={`/api/video/${videoId}`} type="video/mp4" />
     </video>

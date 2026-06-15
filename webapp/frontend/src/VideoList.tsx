@@ -1,10 +1,19 @@
 
 import { useEffect, useState } from "react";
 
-function VideoList({ onSelectVideo }) {
-    const [videos, setVideos] = useState([]);
+type Video = {
+  video_id: number,
+  name: string,
+};
+
+type VideoListProps = {
+  onSelectVideo:(video_id: number) => void;
+};
+
+function VideoList({ onSelectVideo }: VideoListProps) {
+    const [videos, setVideos] = useState<Video[]>([]);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -22,7 +31,7 @@ function VideoList({ onSelectVideo }) {
                 }
             } catch (err) {
                 if (!cancelled) {
-                    setError(err.message);
+                    setError(err instanceof Error ? err.message : String(err));
                 }
             } finally {
                 if (!cancelled) {
@@ -44,7 +53,7 @@ function VideoList({ onSelectVideo }) {
     if (error) return <p style={{ color: "red" }}>Error: {error}</p>;
 
     return (
-      <table border="1" cellPadding="8">
+      <table style={{ borderCollapse: "collapse" }}>
         <thead>
           <tr>
             <th>Id</th>

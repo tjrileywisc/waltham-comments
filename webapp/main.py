@@ -6,6 +6,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
+from pydantic import BaseModel
 
 from yoyo import get_backend, read_migrations
 
@@ -15,6 +16,15 @@ from monitoring import setup_logging
 
 logger = setup_logging("webapp")
 
+class VideoSummary(BaseModel):
+    video_id: int
+    name: str
+class SearchResult(BaseModel):
+    video_id: int
+    meeting_name: str
+    start: float
+    text: str
+    score: float
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -106,7 +116,7 @@ def get_video(video_id: int, request: Request) -> StreamingResponse:
     )
 
 
-@app.get("/api/videos")
+@app.get("/api/videos", response_model=list[VideoSummary])
 def get_videos():
     return VIDEO_DB
 
@@ -120,13 +130,18 @@ def healthcheck() -> int:
     return 200
 
 
-@app.get("/api/search")
+@app.get("/api/search", response_model=list[SearchResult])
 def search(query: str):
     results = do_search(query)
     name_to_id = {v["name"]: v["video_id"] for v in VIDEO_DB}
+    matching = []
     for r in results:
-        r["video_id"] = name_to_id.get(r["meeting_name"])
-    return results
+        video_id = name_to_id.get(r["meeting_name"])
+        if video_id is not None:
+            # we might not have the video locally
+            r["video_id"] = video_id
+            matching.append(r)
+    return matching
 
 
 @app.get("/{full_path:path}")

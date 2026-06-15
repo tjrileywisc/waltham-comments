@@ -20,10 +20,12 @@ def vector_search(query: str) -> list[UtteranceResult]:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT u.id, u.meeting_name, u.start_time, u.text, u.speaker,
+                SELECT u.id, m.meeting_name, u.start_time, u.text, s.speaker_name,
                     1 - (ue.embedding <=> %s::vector) AS score
                 FROM utterance_embeddings ue
                 JOIN utterances u ON ue.utterance_id = u.id
+                JOIN speakers s on s.id = u.speaker_id
+                JOIN meetings m on u.meeting_id = m.id
                 ORDER BY ue.embedding <=> %s::vector
                 LIMIT 10
                 """,
@@ -37,7 +39,7 @@ def vector_search(query: str) -> list[UtteranceResult]:
             "meeting_name": row[1],
             "start": row[2],
             "text": row[3],
-            "speaker": row[4],
+            "speaker_name": row[4],
             "score": float(row[5]),
         }
         for row in rows
@@ -50,16 +52,17 @@ def exact_search(query: str) -> list[UtteranceResult]:
             cur.execute(
                 """
                 SELECT
-                    id, meeting_name, start_time, text, speaker,
-                    ts_rank_cd(ts_vector, query) AS exact_score
-                FROM utterances,
-                    phraseto_tsquery('english', %s) AS query
+                    u.id, m.meeting_name, u.start_time, u.text, s.speaker_name,
+                    ts_rank_cd(u.ts_vector, phraseto_tsquery('english', %s)) AS exact_score
+                FROM utterances u
+                JOIN meetings m on u.meeting_id = m.id
+                JOIN speakers s on u.speaker_id = s.id
                 WHERE
-                    ts_vector @@ query
+                    ts_vector @@ phraseto_tsquery('english', %s)
                 ORDER BY exact_score DESC
                 LIMIT 10
                 """,
-                (query,)
+                (query, query)
             )
             rows = cur.fetchall()
             
@@ -69,7 +72,7 @@ def exact_search(query: str) -> list[UtteranceResult]:
             "meeting_name": row[1],
             "start": row[2],
             "text": row[3],
-            "speaker": row[4],
+            "speaker_name": row[4],
             "score": float(row[5]),
         }
         for row in rows
