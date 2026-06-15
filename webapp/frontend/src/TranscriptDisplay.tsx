@@ -1,12 +1,12 @@
 import { useEffect, useState, useRef } from "react";
 
 type TranscriptProps = {
-  videoId: number,
+  videoId: number | null,
   currentTime: number
   onSeek: (time: number) => void
 };
 
-interface SpeechSegment {
+type SpeechSegment = {
   id: number,
   start: number,
   end: number,
@@ -15,7 +15,7 @@ interface SpeechSegment {
 };
 
 function TranscriptDisplay({ videoId, currentTime, onSeek }: TranscriptProps) {
-  const [segments, setSegments] = useState<Array<SpeechSegment>>([]);
+  const [segments, setSegments] = useState<SpeechSegment[]>([]);
   const [error, setError] = useState<string | null>(null);
   const itemsRef = useRef<(HTMLTableRowElement | null)[]>([])
 
@@ -37,8 +37,8 @@ function TranscriptDisplay({ videoId, currentTime, onSeek }: TranscriptProps) {
         }
         const data = await res.json();
         setSegments(data);
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
       }
     }
 
@@ -56,7 +56,7 @@ function TranscriptDisplay({ videoId, currentTime, onSeek }: TranscriptProps) {
   if (!segments.length) return null;
 
   function formatTime(seconds: number): string {
-    const m: number = Math.floor(seconds / 60);
+    const m = Math.floor(seconds / 60);
     const s = Math.floor(seconds % 60);
     return `${m}:${s.toString().padStart(2, '0')}`;
   }
@@ -70,7 +70,7 @@ function TranscriptDisplay({ videoId, currentTime, onSeek }: TranscriptProps) {
       <table style={{ tableLayout: 'fixed' }}>
         <tbody>
           {segments.map((segment, i) => (
-            <tr onClick={() => loadSegment(i)} key={i} ref={(el) => (itemsRef.current[i] = el)}
+            <tr onClick={() => loadSegment(i)} key={i} ref={(el) => {itemsRef.current[i] = el}}
                 className={i === activeIdx ? 'active' : ''}>
               <td>{formatTime(segment.start)}</td>
               <td style={{width: '50px' }}>{segment.speaker}</td>

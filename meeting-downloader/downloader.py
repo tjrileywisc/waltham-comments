@@ -253,6 +253,7 @@ class MeetingDownloader:
                 "-safe", "0",
                 "-i", concat_file,
                 "-c", "copy",
+                "-reset_timestamps", "1",
                 output_file
             ]
             result = subprocess.run(cmd, capture_output=True, text=True)

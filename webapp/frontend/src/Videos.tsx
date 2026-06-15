@@ -8,13 +8,13 @@ import TranscriptDisplay from "./TranscriptDisplay";
 
 import "./styles.css";
 
-function App() {
+function Videos() {
   const [searchParams] = useSearchParams();
-  const initialVideoId = searchParams.get("video") != null ? parseInt(searchParams.get("video")) : null;
-  const startTime = searchParams.get("t") != null ? parseFloat(searchParams.get("t")) : 0;
+  const initialVideoId = searchParams.get("video") != null ? parseInt(searchParams.get("video")!) : null;
+  const startTime = searchParams.get("t") != null ? parseFloat(searchParams.get("t")!) : 0;
 
   const [videoId, setVideoId] = useState(initialVideoId);
-  const [seekTo, setSeekTo] = useState(null);
+  const [seekTo, setSeekTo] = useState<number | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
 
   return (
@@ -34,4 +34,4 @@ function App() {
   );
 }
 
-export default App;
+export default Videos;
