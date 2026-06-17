@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 
 type SearchResult = {
     video_id: number,
@@ -10,13 +10,22 @@ type SearchResult = {
 
 function Search() {
 
-    const [query, setQuery] = useState("");
+    const [params, setParams] = useSearchParams();
+    const [query, setQuery] = useState(() => params.get("q") ?? "");
     const [results, setResults] = useState<SearchResult[]>([]);
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
 
+    useEffect(()=> {
+        handleSearch(null);
+    }, []);
+
     const handleSearch = async (e: any) => {
-        e.preventDefault();
+        if(e !== null) {
+            // i.e user got here from clicking search
+            e.preventDefault();
+            setParams({q : query});
+        }
 
         if (!query.trim()) return;
 
@@ -47,7 +56,10 @@ function Search() {
                 <input
                     type="text"
                     value={query}
-                    onChange={(e) => setQuery(e.target.value)}
+                    onChange={(e) => {
+                        setQuery(e.target.value);
+                        }
+                    }
                     placeholder="Enter search text"
                     className="search-input"
                 />
