@@ -1,0 +1,92 @@
+import os
+import pytest
+from unittest.mock import MagicMock, patch
+
+os.environ.setdefault("ADMIN_USER", "admin")
+os.environ.setdefault("ADMIN_PASSWORD", "secret")
+os.environ.setdefault("DATABASE_URL", "postgresql://test")
+os.environ.setdefault("DATA_DIR", "/tmp")
+
+from fastapi.testclient import TestClient
+from main import app
+
+client = TestClient(app, raise_server_exceptions=False)
+AUTH = ("admin", "secret")
+
+
+def make_mock_conn(fetchall_results=None, fetchone_results=None):
+    mock_cur = MagicMock()
+    mock_cur.__enter__ = lambda s: s
+    mock_cur.__exit__ = MagicMock(return_value=False)
+    if fetchall_results is not None:
+        mock_cur.fetchall.side_effect = fetchall_results
+    if fetchone_results is not None:
+        mock_cur.fetchone.side_effect = fetchone_results
+    mock_conn = MagicMock()
+    mock_conn.__enter__ = lambda s: mock_conn
+    mock_conn.__exit__ = MagicMock(return_value=False)
+    mock_conn.cursor.return_value = mock_cur
+    return mock_conn
+
+
+def test_admin_meetings_requires_auth():
+    r = client.get("/admin/meetings")
+    assert r.status_code == 401
+
+
+def test_admin_meetings_rejects_wrong_password():
+    r = client.get("/admin/meetings", auth=("admin", "wrong"))
+    assert r.status_code == 401
+
+
+def test_admin_meetings_returns_list():
+    mock_conn = make_mock_conn(
+        fetchall_results=[[(1, "City Council 1-12-26", "2026-01-12", "City Council", 2)]]
+    )
+    with patch("main.connect", return_value=mock_conn):
+        r = client.get("/admin/meetings", auth=AUTH)
+    assert r.status_code == 200
+    data = r.json()
+    assert len(data) == 1
+    assert data[0]["meeting_name"] == "City Council 1-12-26"
+    assert data[0]["unlabeled_count"] == 2
+
+
+def test_admin_label_cluster_returns_ok():
+    mock_conn = make_mock_conn(
+        fetchone_results=[None, (42,)],  # no existing speaker, then new id
+    )
+    with patch("main.connect", return_value=mock_conn):
+        r = client.post(
+            "/admin/meetings/1/clusters/SPEAKER_0/label",
+            json={"speaker_name": "Councilor Smith"},
+            auth=AUTH,
+        )
+    assert r.status_code == 200
+    assert r.json() == {"ok": True}
+
+
+def test_admin_set_canonical_404_for_missing_embedding():
+    mock_conn = make_mock_conn(fetchone_results=[None])
+    with patch("main.connect", return_value=mock_conn):
+        r = client.post("/admin/speaker-embeddings/999/canonical", auth=AUTH)
+    assert r.status_code == 404
+
+
+def test_admin_set_canonical_400_when_embedding_unlabeled():
+    mock_conn = make_mock_conn(fetchone_results=[(None,)])  # speaker_id is NULL
+    with patch("main.connect", return_value=mock_conn):
+        r = client.post("/admin/speaker-embeddings/1/canonical", auth=AUTH)
+    assert r.status_code == 400
+
+
+def test_admin_speakers_returns_list():
+    mock_conn = make_mock_conn(
+        fetchall_results=[[(3, "Councilor Smith", None, 42, 100, 0.81, 5)]]
+    )
+    with patch("main.connect", return_value=mock_conn):
+        r = client.get("/admin/speakers", auth=AUTH)
+    assert r.status_code == 200
+    data = r.json()
+    assert data[0]["speaker_name"] == "Councilor Smith"
+    assert data[0]["mean_confidence"] == pytest.approx(0.81)

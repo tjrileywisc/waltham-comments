@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, StreamingResponse
@@ -11,6 +11,10 @@ from pydantic import BaseModel
 from yoyo import get_backend, read_migrations
 
 from lib.db import connect, get_transcript as db_get_transcript
+from lib.admin import (
+    get_admin, get_meetings, get_clusters,
+    label_cluster, set_canonical, get_speakers,
+)
 from lib.search import do_search
 from monitoring import setup_logging
 
@@ -25,6 +29,9 @@ class SearchResult(BaseModel):
     start: float
     text: str
     score: float
+
+class LabelRequest(BaseModel):
+    speaker_name: str
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -55,11 +62,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.mount(
-    "/assets",
-    StaticFiles(directory="./frontend/dist/assets"),
-    name="static"
-)
+if Path("./frontend/dist/assets").exists():
+    app.mount(
+        "/assets",
+        StaticFiles(directory="./frontend/dist/assets"),
+        name="static"
+    )
 
 VIDEO_DB = list()
 
@@ -136,6 +144,38 @@ def search(query: str):
             r["video_id"] = video_id
             matching.append(r)
     return matching
+
+
+@app.get("/admin/meetings")
+def admin_meetings(_=Depends(get_admin)):
+    with connect() as conn:
+        return get_meetings(conn)
+
+
+@app.get("/admin/meetings/{meeting_id}/clusters")
+def admin_meeting_clusters(meeting_id: int, _=Depends(get_admin)):
+    with connect() as conn:
+        return get_clusters(conn, meeting_id)
+
+
+@app.post("/admin/meetings/{meeting_id}/clusters/{cluster}/label")
+def admin_label_cluster(meeting_id: int, cluster: str, body: LabelRequest, _=Depends(get_admin)):
+    with connect() as conn:
+        label_cluster(conn, meeting_id, cluster, body.speaker_name)
+    return {"ok": True}
+
+
+@app.post("/admin/speaker-embeddings/{embedding_id}/canonical")
+def admin_set_canonical(embedding_id: int, _=Depends(get_admin)):
+    with connect() as conn:
+        set_canonical(conn, embedding_id)
+    return {"ok": True}
+
+
+@app.get("/admin/speakers")
+def admin_speakers(_=Depends(get_admin)):
+    with connect() as conn:
+        return get_speakers(conn)
 
 
 @app.get("/{full_path:path}")
