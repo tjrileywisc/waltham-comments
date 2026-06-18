@@ -37,7 +37,7 @@ function AdminLabel() {
   const [error, setError] = useState<string | null>(null);
 
   function loadClusters() {
-    fetch(`/admin/meetings/${meetingId}/clusters`)
+    fetch(`/api/admin/meetings/${meetingId}/clusters`)
       .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
       .then((data: Cluster[]) => {
         setClusters(data);
@@ -50,7 +50,7 @@ function AdminLabel() {
   }
 
   function loadSpeakers() {
-    fetch("/admin/speakers")
+    fetch("/api/admin/speakers")
       .then((r) => r.json())
       .then(setKnownSpeakers)
       .catch(() => {});
@@ -67,7 +67,7 @@ function AdminLabel() {
 
   function submitLabel() {
     if (!selected || !nameInput.trim()) return;
-    fetch(`/admin/meetings/${meetingId}/clusters/${selected.diarization_speaker}/label`, {
+    fetch(`/api/admin/meetings/${meetingId}/clusters/${selected.diarization_speaker}/label`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ speaker_name: nameInput.trim() }),
@@ -78,7 +78,7 @@ function AdminLabel() {
   }
 
   function markCanonical(embeddingId: number) {
-    fetch(`/admin/speaker-embeddings/${embeddingId}/canonical`, { method: "POST" })
+    fetch(`/api/admin/speaker-embeddings/${embeddingId}/canonical`, { method: "POST" })
       .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); })
       .then(loadClusters)
       .catch((e: Error) => setError(e.message));

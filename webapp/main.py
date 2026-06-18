@@ -146,33 +146,33 @@ def search(query: str):
     return matching
 
 
-@app.get("/admin/meetings")
+@app.get("/api/admin/meetings")
 def admin_meetings(_=Depends(get_admin)):
     with connect() as conn:
         return get_meetings(conn)
 
 
-@app.get("/admin/meetings/{meeting_id}/clusters")
+@app.get("/api/admin/meetings/{meeting_id}/clusters")
 def admin_meeting_clusters(meeting_id: int, _=Depends(get_admin)):
     with connect() as conn:
         return get_clusters(conn, meeting_id)
 
 
-@app.post("/admin/meetings/{meeting_id}/clusters/{cluster}/label")
+@app.post("/api/admin/meetings/{meeting_id}/clusters/{cluster}/label")
 def admin_label_cluster(meeting_id: int, cluster: str, body: LabelRequest, _=Depends(get_admin)):
     with connect() as conn:
         label_cluster(conn, meeting_id, cluster, body.speaker_name)
     return {"ok": True}
 
 
-@app.post("/admin/speaker-embeddings/{embedding_id}/canonical")
+@app.post("/api/admin/speaker-embeddings/{embedding_id}/canonical")
 def admin_set_canonical(embedding_id: int, _=Depends(get_admin)):
     with connect() as conn:
         set_canonical(conn, embedding_id)
     return {"ok": True}
 
 
-@app.get("/admin/speakers")
+@app.get("/api/admin/speakers")
 def admin_speakers(_=Depends(get_admin)):
     with connect() as conn:
         return get_speakers(conn)

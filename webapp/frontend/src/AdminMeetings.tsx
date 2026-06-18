@@ -14,7 +14,7 @@ function AdminMeetings() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/admin/meetings")
+    fetch("/api/admin/meetings")
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
