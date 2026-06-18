@@ -2,8 +2,8 @@ import os
 import pytest
 from unittest.mock import MagicMock, patch
 
-os.environ.setdefault("ADMIN_USER", "admin")
-os.environ.setdefault("ADMIN_PASSWORD", "secret")
+os.environ["ADMIN_USER"] = "admin"
+os.environ["ADMIN_PASSWORD"] = "secret"
 os.environ.setdefault("DATABASE_URL", "postgresql://test")
 os.environ.setdefault("DATA_DIR", "/tmp")
 

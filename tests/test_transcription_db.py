@@ -170,8 +170,8 @@ def test_save_speaker_embeddings_inserts_one_row_per_cluster(mocker):
     mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
 
     embeddings = {
-        "SPEAKER_0": np.zeros(192),
-        "SPEAKER_1": np.ones(192),
+        "SPEAKER_0": np.zeros(256),
+        "SPEAKER_1": np.ones(256),
     }
     cluster_to_speaker_id = {"SPEAKER_0": 5, "SPEAKER_1": None}
 
@@ -192,7 +192,7 @@ def test_save_speaker_embeddings_passes_none_speaker_id_for_unmatched(mocker):
     mock_conn.cursor.return_value.__enter__ = MagicMock(return_value=mock_cur)
     mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
 
-    embeddings = {"SPEAKER_0": np.zeros(192)}
+    embeddings = {"SPEAKER_0": np.zeros(256)}
     save_speaker_embeddings(mock_conn, meeting_id=1, speaker_embeddings=embeddings,
                             cluster_to_speaker_id={"SPEAKER_0": None})
 

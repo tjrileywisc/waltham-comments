@@ -30,7 +30,7 @@
 - Produces:
   - `utterances.diarization_speaker TEXT` — original WhisperX cluster label (e.g. `"SPEAKER_0"`)
   - `utterances.confidence FLOAT` — cosine similarity score at identification time; NULL if unmatched or pre-feature
-  - `speaker_embeddings` table: `(id, speaker_id REFERENCES speakers, meeting_id REFERENCES meetings NOT NULL, diarization_speaker TEXT NOT NULL, embedding vector(192), is_canonical BOOL NOT NULL DEFAULT FALSE, created_at TIMESTAMP NOT NULL DEFAULT NOW())` with `UNIQUE(meeting_id, diarization_speaker)`
+  - `speaker_embeddings` table: `(id, speaker_id REFERENCES speakers, meeting_id REFERENCES meetings NOT NULL, diarization_speaker TEXT NOT NULL, embedding vector(256), is_canonical BOOL NOT NULL DEFAULT FALSE, created_at TIMESTAMP NOT NULL DEFAULT NOW())` with `UNIQUE(meeting_id, diarization_speaker)`
 
 - [ ] **Step 1: Create the migration file**
 
@@ -44,7 +44,7 @@ CREATE TABLE speaker_embeddings (
     speaker_id           INT REFERENCES speakers(id),
     meeting_id           INT REFERENCES meetings(id) NOT NULL,
     diarization_speaker  TEXT NOT NULL,
-    embedding            vector(192),
+    embedding            vector(256),
     is_canonical         BOOL NOT NULL DEFAULT FALSE,
     created_at           TIMESTAMP NOT NULL DEFAULT NOW(),
     UNIQUE (meeting_id, diarization_speaker)
@@ -356,8 +356,8 @@ def test_save_speaker_embeddings_inserts_one_row_per_cluster(mocker):
     mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
 
     embeddings = {
-        "SPEAKER_0": np.zeros(192),
-        "SPEAKER_1": np.ones(192),
+        "SPEAKER_0": np.zeros(256),
+        "SPEAKER_1": np.ones(256),
     }
     cluster_to_speaker_id = {"SPEAKER_0": 5, "SPEAKER_1": None}
 
@@ -378,7 +378,7 @@ def test_save_speaker_embeddings_passes_none_speaker_id_for_unmatched(mocker):
     mock_conn.cursor.return_value.__enter__ = MagicMock(return_value=mock_cur)
     mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
 
-    embeddings = {"SPEAKER_0": np.zeros(192)}
+    embeddings = {"SPEAKER_0": np.zeros(256)}
     save_speaker_embeddings(mock_conn, meeting_id=1, speaker_embeddings=embeddings,
                             cluster_to_speaker_id={"SPEAKER_0": None})
 

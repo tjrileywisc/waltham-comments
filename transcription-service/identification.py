@@ -16,7 +16,7 @@ class Identifier:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT s.speaker_name, se.embedding::text
+                SELECT s.speaker_name, se.embedding_vec::text
                 FROM speaker_embeddings se
                 JOIN speakers s ON s.id = se.speaker_id
                 WHERE se.is_canonical = TRUE

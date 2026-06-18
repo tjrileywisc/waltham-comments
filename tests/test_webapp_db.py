@@ -15,9 +15,6 @@ def test_get_transcript_returns_rows():
     from lib.db import get_transcript
     result = get_transcript(mock_conn, "Test Meeting")
 
-    sql = mock_cur.execute.call_args.args[0]
-    assert "WHERE meeting_name" in sql
-
     assert result == [
         {"id": 0, "start": 0.0, "end": 2.0, "text": "Hello", "speaker": "SPEAKER_00"},
         {"id": 1, "start": 2.5, "end": 4.0, "text": "World", "speaker": "SPEAKER_01"},

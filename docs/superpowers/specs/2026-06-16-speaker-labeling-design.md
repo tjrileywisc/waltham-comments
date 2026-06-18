@@ -42,7 +42,7 @@ CREATE TABLE speaker_embeddings (
     speaker_id           INT REFERENCES speakers(id),   -- NULL until labeled
     meeting_id           INT REFERENCES meetings(id) NOT NULL,
     diarization_speaker  TEXT NOT NULL,                 -- "SPEAKER_0" etc.
-    embedding            vector(192),
+    embedding            vector(256),
     is_canonical         BOOL DEFAULT FALSE,
     created_at           TIMESTAMP DEFAULT NOW(),
     UNIQUE (meeting_id, diarization_speaker)

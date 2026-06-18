@@ -127,7 +127,7 @@ def save_speaker_embeddings(
             vec_str = "[" + ",".join(str(x) for x in embedding) + "]"
             cur.execute(
                 """
-                INSERT INTO speaker_embeddings (speaker_id, meeting_id, diarization_speaker, embedding)
+                INSERT INTO speaker_embeddings (speaker_id, meeting_id, diarization_speaker, embedding_vec)
                 VALUES (%s, %s, %s, %s::vector)
                 ON CONFLICT (meeting_id, diarization_speaker) DO NOTHING
                 """,
