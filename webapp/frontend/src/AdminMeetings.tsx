@@ -7,6 +7,7 @@ type Meeting = {
   meeting_date: string;
   meeting_type: string;
   unlabeled_count: number;
+  video_id: number | null;
 };
 
 function AdminMeetings() {
@@ -46,7 +47,7 @@ function AdminMeetings() {
               <td>{m.meeting_type}</td>
               <td>{m.unlabeled_count > 0 ? m.unlabeled_count : "—"}</td>
               <td>
-                <Link to={`/admin/meetings/${m.id}/label`}>Label</Link>
+                <Link to={`/admin/meetings/${m.id}/label`} state={{ videoId: m.video_id }}>Label</Link>
               </td>
             </tr>
           ))}

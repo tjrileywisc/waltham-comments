@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useLocation } from "react-router-dom";
 import VideoPlayer from "./VideoPlayer";
 
 type Utterance = {
@@ -27,6 +27,7 @@ function formatTime(s: number) {
 function AdminLabel() {
   const { id } = useParams<{ id: string }>();
   const meetingId = Number(id);
+  const videoId: number | null = useLocation().state?.videoId ?? null;
 
   const [clusters, setClusters] = useState<Cluster[]>([]);
   const [selected, setSelected] = useState<Cluster | null>(null);
@@ -133,7 +134,7 @@ function AdminLabel() {
             </div>
 
             <VideoPlayer
-              videoId={meetingId}
+              videoId={videoId}
               onTimeUpdate={setCurrentTime}
               seekTo={seekTo}
             />

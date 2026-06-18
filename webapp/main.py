@@ -148,8 +148,12 @@ def search(query: str):
 
 @app.get("/api/admin/meetings")
 def admin_meetings(_=Depends(get_admin)):
+    name_to_video_id = {v["name"]: v["video_id"] for v in VIDEO_DB}
     with connect() as conn:
-        return get_meetings(conn)
+        meetings = get_meetings(conn)
+    for m in meetings:
+        m["video_id"] = name_to_video_id.get(m["meeting_name"])
+    return meetings
 
 
 @app.get("/api/admin/meetings/{meeting_id}/clusters")
