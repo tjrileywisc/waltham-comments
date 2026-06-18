@@ -42,9 +42,9 @@ def transcription(meeting_name: str):
     os.makedirs(MODELS_DIR, exist_ok=True)
 
     model = whisperx.load_model(
-        "large-v2", DEVICE,
+        "medium", DEVICE,
         compute_type=COMPUTE_TYPE, language="en",
-        download_root=MODELS_DIR, threads=8,
+        download_root=MODELS_DIR, threads=CPU_THREADS,
     )
 
     audio = whisperx.load_audio(audio_file)
