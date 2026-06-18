@@ -1,4 +1,4 @@
-FROM ubuntu:24.04
+FROM nvidia/cuda:12.8.1-cudnn-runtime-ubuntu24.04
 
 RUN apt update && apt install -y ffmpeg
 

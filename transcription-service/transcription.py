@@ -26,7 +26,7 @@ if CPU_THREADS > 0:
 
 TEXT = "text"
 SPEAKER = "speaker"
-DEVICE = "cpu"
+DEVICE = "cuda"
 BATCH_SIZE = 1
 COMPUTE_TYPE = "int8"
 
