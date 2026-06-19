@@ -158,8 +158,14 @@ def admin_meetings(_=Depends(get_admin)):
 
 @app.get("/api/admin/meetings/{meeting_id}/clusters")
 def admin_meeting_clusters(meeting_id: int, _=Depends(get_admin)):
+    name_to_video_id = {v["name"]: v["video_id"] for v in VIDEO_DB}
     with connect() as conn:
-        return get_clusters(conn, meeting_id)
+        clusters = get_clusters(conn, meeting_id)
+        with conn.cursor() as cur:
+            cur.execute("SELECT meeting_name FROM meetings WHERE id = %s", (meeting_id,))
+            row = cur.fetchone()
+    meeting_name = row[0] if row else None
+    return {"video_id": name_to_video_id.get(meeting_name), "clusters": clusters}
 
 
 @app.post("/api/admin/meetings/{meeting_id}/clusters/{cluster}/label")

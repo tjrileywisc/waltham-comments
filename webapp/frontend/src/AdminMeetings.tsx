@@ -10,6 +10,10 @@ type Meeting = {
   video_id: number | null;
 };
 
+/**
+ * Meeting level view of currently unlabeled speakers in meetings
+ * @returns 
+ */
 function AdminMeetings() {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -47,7 +51,7 @@ function AdminMeetings() {
               <td>{m.meeting_type}</td>
               <td>{m.unlabeled_count > 0 ? m.unlabeled_count : "—"}</td>
               <td>
-                <Link to={`/admin/meetings/${m.id}/label`} state={{ videoId: m.video_id }}>Label</Link>
+                <Link to={`/admin/meetings/${m.id}/label`}>Label</Link>
               </td>
             </tr>
           ))}

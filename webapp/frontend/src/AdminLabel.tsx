@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, useLocation } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import VideoPlayer from "./VideoPlayer";
 
 type Utterance = {
@@ -24,11 +24,15 @@ function formatTime(s: number) {
   return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 }
 
+/**
+ * Labeling interface for speakers identified in a video
+ * @returns 
+ */
 function AdminLabel() {
   const { id } = useParams<{ id: string }>();
   const meetingId = Number(id);
-  const videoId: number | null = useLocation().state?.videoId ?? null;
 
+  const [videoId, setVideoId] = useState<number | null>(null);
   const [clusters, setClusters] = useState<Cluster[]>([]);
   const [selected, setSelected] = useState<Cluster | null>(null);
   const [nameInput, setNameInput] = useState("");
@@ -40,11 +44,12 @@ function AdminLabel() {
   function loadClusters() {
     fetch(`/api/admin/meetings/${meetingId}/clusters`)
       .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
-      .then((data: Cluster[]) => {
-        setClusters(data);
+      .then((data: { video_id: number | null; clusters: Cluster[] }) => {
+        setVideoId(data.video_id);
+        setClusters(data.clusters);
         setSelected((prev) => {
-          const updated = data.find((c) => c.diarization_speaker === prev?.diarization_speaker);
-          return updated ?? (data[0] ?? null);
+          const updated = data.clusters.find((c) => c.diarization_speaker === prev?.diarization_speaker);
+          return updated ?? (data.clusters[0] ?? null);
         });
       })
       .catch((e: Error) => setError(e.message));
