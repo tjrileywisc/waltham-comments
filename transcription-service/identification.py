@@ -1,6 +1,7 @@
 import numpy as np
 from numpy.typing import NDArray
 from typing import Dict, List
+from collections import defaultdict
 from sklearn.metrics.pairwise import cosine_similarity
 
 
@@ -19,7 +20,7 @@ class Identifier:
                 SELECT s.speaker_name, se.embedding_vec::text
                 FROM speaker_embeddings se
                 JOIN speakers s ON s.id = se.speaker_id
-                WHERE se.is_canonical = TRUE
+                WHERE se.speaker_id IS NOT NULL
                 """
             )
             rows = cur.fetchall()
@@ -27,10 +28,15 @@ class Identifier:
         if not rows:
             return [(self.DEFAULT_SPEAKER, None)] * len(speaker_embeddings)
 
-        db_names = [row[0] for row in rows]
+        speaker_vecs: dict[str, list] = defaultdict(list)
+        for name, emb_text in rows:
+            speaker_vecs[name].append(
+                [float(x) for x in emb_text.strip("[]").split(",")]
+            )
+
+        db_names = list(speaker_vecs.keys())
         db_embeddings = np.array([
-            [float(x) for x in row[1].strip("[]").split(",")]
-            for row in rows
+            np.mean(speaker_vecs[name], axis=0) for name in db_names
         ])
 
         incoming = np.array(list(speaker_embeddings.values()))
