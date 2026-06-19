@@ -1,6 +1,7 @@
 import pytest
-from db import build_window_text, extract_meeting_type, extract_meeting_date, extract_meeting_part, is_meeting_processed, save_meeting
 from unittest.mock import MagicMock
+from helpers import make_mock_conn
+from db import build_window_text, extract_meeting_type, extract_meeting_date, extract_meeting_part, is_meeting_processed, save_meeting
 
 
 def test_build_window_text_includes_preceding_segments_within_window():
@@ -36,15 +37,10 @@ def test_build_window_text_first_segment():
 def test_save_meeting_returns_meeting_id_and_speaker_lookup(mocker):
     segments = [{"start": 0.0, "end": 2.0, "text": "Hello", "speaker": "DEFAULT"}]
 
-    mock_cur = MagicMock()
-    mock_cur.fetchone.return_value = (7,)          # meeting_id = 7
-    mock_cur.fetchall.side_effect = [
-        [(99, "DEFAULT")],                          # speaker lookup
-        [(1,)],                                     # utterance ids
-    ]
-    mock_conn = MagicMock()
-    mock_conn.cursor.return_value.__enter__ = MagicMock(return_value=mock_cur)
-    mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
+    mock_conn = make_mock_conn(
+        fetchone_results=[(7,)],
+        fetchall_results=[[(99, "DEFAULT")], [(1,)]],
+    )
 
     mock_resp = MagicMock()
     mock_resp.json.return_value = {"embeddings": [[0.1] * 384]}
@@ -64,12 +60,11 @@ def test_save_meeting_stores_diarization_speaker_and_confidence(mocker):
         "confidence": 0.83,
     }]
 
-    mock_cur = MagicMock()
-    mock_cur.fetchone.return_value = (1,)
-    mock_cur.fetchall.side_effect = [[(99, "DEFAULT")], [(1,)]]
-    mock_conn = MagicMock()
-    mock_conn.cursor.return_value.__enter__ = MagicMock(return_value=mock_cur)
-    mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
+    mock_conn = make_mock_conn(
+        fetchone_results=[(1,)],
+        fetchall_results=[[(99, "DEFAULT")], [(1,)]],
+    )
+    mock_cur = mock_conn.cursor.return_value
 
     mock_resp = MagicMock()
     mock_resp.json.return_value = {"embeddings": [[0.0] * 384]}
@@ -83,21 +78,12 @@ def test_save_meeting_stores_diarization_speaker_and_confidence(mocker):
     assert rows[0][6] == "SPEAKER_2"   # diarization_speaker at index 6
     assert rows[0][7] == pytest.approx(0.83)  # confidence at index 7
     
-def _make_mock_conn(fetchone_result):
-    mock_cur = MagicMock()
-    mock_cur.fetchone.return_value = fetchone_result
-    mock_conn = MagicMock()
-    mock_conn.cursor.return_value.__enter__ = MagicMock(return_value=mock_cur)
-    mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
-    return mock_conn
-
-
 def test_is_meeting_processed_returns_true_when_present():
-    assert is_meeting_processed(_make_mock_conn(("meeting_name",)), "meeting_name") is True
+    assert is_meeting_processed(make_mock_conn(fetchone_results=[("meeting_name",)]), "meeting_name") is True
 
 
 def test_is_meeting_processed_returns_false_when_absent():
-    assert is_meeting_processed(_make_mock_conn(None), "new_meeting") is False
+    assert is_meeting_processed(make_mock_conn(fetchone_results=[None]), "new_meeting") is False
 
 def test_extract_meeting_type_strips_trailing_date():
     assert extract_meeting_type("City Council 6-13-26") == "City Council"
@@ -142,12 +128,11 @@ def test_extract_meeting_part():
 def test_save_meeting_stores_none_for_missing_diarization_fields(mocker):
     segments = [{"start": 0.0, "end": 1.0, "text": "Hello", "speaker": "DEFAULT"}]
 
-    mock_cur = MagicMock()
-    mock_cur.fetchone.return_value = (1,)
-    mock_cur.fetchall.side_effect = [[(99, "DEFAULT")], [(1,)]]
-    mock_conn = MagicMock()
-    mock_conn.cursor.return_value.__enter__ = MagicMock(return_value=mock_cur)
-    mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
+    mock_conn = make_mock_conn(
+        fetchone_results=[(1,)],
+        fetchall_results=[[(99, "DEFAULT")], [(1,)]],
+    )
+    mock_cur = mock_conn.cursor.return_value
 
     mock_resp = MagicMock()
     mock_resp.json.return_value = {"embeddings": [[0.0] * 384]}
@@ -164,10 +149,8 @@ def test_save_speaker_embeddings_inserts_one_row_per_cluster(mocker):
     import numpy as np
     from db import save_speaker_embeddings
 
-    mock_cur = MagicMock()
-    mock_conn = MagicMock()
-    mock_conn.cursor.return_value.__enter__ = MagicMock(return_value=mock_cur)
-    mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
+    mock_conn = make_mock_conn()
+    mock_cur = mock_conn.cursor.return_value
 
     embeddings = {
         "SPEAKER_0": np.zeros(256),
@@ -187,10 +170,8 @@ def test_save_speaker_embeddings_passes_none_speaker_id_for_unmatched(mocker):
     import numpy as np
     from db import save_speaker_embeddings
 
-    mock_cur = MagicMock()
-    mock_conn = MagicMock()
-    mock_conn.cursor.return_value.__enter__ = MagicMock(return_value=mock_cur)
-    mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
+    mock_conn = make_mock_conn()
+    mock_cur = mock_conn.cursor.return_value
 
     embeddings = {"SPEAKER_0": np.zeros(256)}
     save_speaker_embeddings(mock_conn, meeting_id=1, speaker_embeddings=embeddings,

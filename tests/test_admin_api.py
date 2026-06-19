@@ -1,6 +1,7 @@
 import os
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
+from helpers import make_mock_conn
 
 os.environ["ADMIN_USER"] = "admin"
 os.environ["ADMIN_PASSWORD"] = "secret"
@@ -13,20 +14,6 @@ from main import app
 client = TestClient(app, raise_server_exceptions=False)
 AUTH = ("admin", "secret")
 
-
-def make_mock_conn(fetchall_results=None, fetchone_results=None):
-    mock_cur = MagicMock()
-    mock_cur.__enter__ = lambda s: s
-    mock_cur.__exit__ = MagicMock(return_value=False)
-    if fetchall_results is not None:
-        mock_cur.fetchall.side_effect = fetchall_results
-    if fetchone_results is not None:
-        mock_cur.fetchone.side_effect = fetchone_results
-    mock_conn = MagicMock()
-    mock_conn.__enter__ = lambda s: mock_conn
-    mock_conn.__exit__ = MagicMock(return_value=False)
-    mock_conn.cursor.return_value = mock_cur
-    return mock_conn
 
 
 def test_admin_meetings_requires_auth():
