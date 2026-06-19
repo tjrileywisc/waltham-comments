@@ -1,8 +1,9 @@
 import os
 import requests
 import re
-import psycopg
+
 from datetime import date
+from typing import Hashable
 
 EMBEDDINGS_SERVICE_URL = os.environ.get("EMBEDDINGS_SERVICE_URL", "http://embeddings-service:8001")
 
@@ -119,7 +120,7 @@ def save_meeting(conn, meeting_name: str, segments: list[dict]) -> tuple[int, di
 def save_speaker_embeddings(
     conn,
     meeting_id: int,
-    speaker_embeddings: dict,
+    speaker_embeddings: dict[str, list[float]] | Hashable,
     cluster_to_speaker_id: dict[str, int | None],
 ) -> None:
     with conn.cursor() as cur:
