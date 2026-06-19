@@ -45,6 +45,12 @@ services:
         condition: service_started
       web:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "healthcheck.py"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     volumes:
       - C:/workspace/waltham-comments/audio:/app/audio
       - C:/workspace/waltham-comments/data:/app/data

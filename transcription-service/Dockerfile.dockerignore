@@ -4,5 +4,6 @@
 !transcription-service/main.py
 !transcription-service/transcription.py
 !transcription-service/identification.py
+!transcription-service/healthcheck.py
 !monitoring.py
 !log_config.json
