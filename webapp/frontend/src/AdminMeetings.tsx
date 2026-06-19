@@ -10,13 +10,18 @@ type Meeting = {
   video_id: number | null;
 };
 
+type SortKey = "meeting_date" | "meeting_name" | "meeting_type" | "unlabeled_count";
+type SortDir = "asc" | "desc";
+
 /**
  * Meeting level view of currently unlabeled speakers in meetings
- * @returns 
+ * @returns
  */
 function AdminMeetings() {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [sortKey, setSortKey] = useState<SortKey>("meeting_date");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
 
   useEffect(() => {
     fetch("/api/admin/meetings")
@@ -28,6 +33,27 @@ function AdminMeetings() {
       .catch((e: Error) => setError(e.message));
   }, []);
 
+  function handleSort(key: SortKey) {
+    if (key === sortKey) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
+
+  const sorted = [...meetings].sort((a, b) => {
+    const av = a[sortKey];
+    const bv = b[sortKey];
+    const cmp = av < bv ? -1 : av > bv ? 1 : 0;
+    return sortDir === "asc" ? cmp : -cmp;
+  });
+
+  function SortIndicator({ col }: { col: SortKey }) {
+    if (col !== sortKey) return null;
+    return <span>{sortDir === "asc" ? " ↑" : " ↓"}</span>;
+  }
+
   if (error) return <p>Error: {error}</p>;
 
   return (
@@ -36,15 +62,23 @@ function AdminMeetings() {
       <table>
         <thead>
           <tr>
-            <th>Date</th>
-            <th>Name</th>
-            <th>Type</th>
-            <th>Unlabeled clusters</th>
+            <th style={{ cursor: "pointer" }} onClick={() => handleSort("meeting_date")}>
+              Date<SortIndicator col="meeting_date" />
+            </th>
+            <th style={{ cursor: "pointer" }} onClick={() => handleSort("meeting_name")}>
+              Name<SortIndicator col="meeting_name" />
+            </th>
+            <th style={{ cursor: "pointer" }} onClick={() => handleSort("meeting_type")}>
+              Type<SortIndicator col="meeting_type" />
+            </th>
+            <th style={{ cursor: "pointer" }} onClick={() => handleSort("unlabeled_count")}>
+              Unlabeled clusters<SortIndicator col="unlabeled_count" />
+            </th>
             <th></th>
           </tr>
         </thead>
         <tbody>
-          {meetings.map((m) => (
+          {sorted.map((m) => (
             <tr key={m.id}>
               <td>{m.meeting_date}</td>
               <td>{m.meeting_name}</td>
