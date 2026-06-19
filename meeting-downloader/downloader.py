@@ -48,22 +48,25 @@ class MeetingDownloader:
         self.session.mount("http://", adapter)
         self.session.headers.update(WCAC_HEADERS)
 
-    def get_new_public_meetings(self, playlists: list[str] | None) -> list[str]:
+    def get_new_public_meetings(self, playlists: list[str] | None = None) -> list[PublicMeeting]:
         """Queries the WCAC site for new meetings
 
         Args:
-            playlists (list | None): A list of playlist names to filter on. If None, all playlists are checked.
+            playlists: Playlist names to check. If None, all playlists from settings are checked.
 
         Returns:
             list: a list of PublicMeeting objects
         """
+        active_playlists = (
+            {k: v for k, v in self.playlists.items() if k in playlists}
+            if playlists is not None
+            else self.playlists
+        )
+
         public_meetings = []
 
-        if playlists is not None:
-            # filter
-            self.playlists = {k: v for k, v in self.playlists.items() if k in playlists}
-
-        for org_name, playlist_id in self.playlists.items():
+        for org_name, playlist_id in active_playlists.items():
+            logger.info(f"Checking meetings for {org_name}")
 
             self.session.headers.update({
                 "Referer": f"https://videoplayer.telvue.com/player/{self.player_id}/playlists/{playlist_id}"
@@ -105,7 +108,7 @@ class MeetingDownloader:
                     logger.warning(f"skipping '{meeting_name}', which doesn't have a recognized date format")
                     continue
 
-                public_meetings.insert(n, PublicMeeting(video_id, meeting_name, self.playlists[org_name]))
+                public_meetings.insert(n, PublicMeeting(video_id, meeting_name, playlist_id))
 
             # TODO: someday, just queue this work up
             if len(public_meetings) > 5:
@@ -247,13 +250,16 @@ class MeetingDownloader:
                     f.write(f"file '{os.path.abspath(os.path.join(ts_dir, f'seg-{i:04d}.ts'))}'\n")
 
             # mux with ffmpeg locally - no network calls
+            # -reset_timestamps must be an INPUT option (before -i) for the concat demuxer;
+            # after -i it targets the mp4 muxer, which ignores it, leaving MPEG-TS PCR
+            # offsets in the output and causing transcription timestamp mismatches
             cmd = [
                 "ffmpeg", "-y",
                 "-f", "concat",
                 "-safe", "0",
+                "-reset_timestamps", "1",
                 "-i", concat_file,
                 "-c", "copy",
-                "-reset_timestamps", "1",
                 output_file
             ]
             result = subprocess.run(cmd, capture_output=True, text=True)

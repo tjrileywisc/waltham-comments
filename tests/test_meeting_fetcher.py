@@ -1,8 +1,14 @@
 
-import pytest
+import yaml
 
 from downloader import MeetingDownloader
 from publicmeeting import PublicMeeting
+
+
+def _empty_response(mocker):
+    mock = mocker.Mock()
+    mock.content = b"<div></div>"
+    return mock
 
 def test_wont_redownload_existing_meeting(mocker):
     
@@ -56,3 +62,40 @@ def test_wont_download_nodate_meetings(mocker):
         assert len(meetings) == result
 
         PublicMeeting.meeting_exists.assert_called_once_with(meeting_name) # type: ignore
+
+
+def test_filters_to_specified_playlists(mocker):
+    mock_get = mocker.patch("downloader.requests.Session.get", return_value=_empty_response(mocker))
+    mocker.patch("publicmeeting.PublicMeeting.meeting_exists", return_value=False)
+    mocker.patch("downloader.time.sleep")
+
+    downloader = MeetingDownloader()
+    downloader.get_new_public_meetings(["City Council"])
+
+    assert mock_get.call_count == 1
+    assert "5499" in mock_get.call_args.args[0]
+
+
+def test_queries_all_playlists_when_no_filter(mocker):
+    mock_get = mocker.patch("downloader.requests.Session.get", return_value=_empty_response(mocker))
+    mocker.patch("publicmeeting.PublicMeeting.meeting_exists", return_value=False)
+    mocker.patch("downloader.time.sleep")
+
+    with open("settings.yaml") as f:
+        expected_count = len(yaml.safe_load(f)["playlists"])
+
+    downloader = MeetingDownloader()
+    downloader.get_new_public_meetings(None)
+
+    assert mock_get.call_count == expected_count
+
+
+def test_unknown_playlist_name_skipped(mocker):
+    mock_get = mocker.patch("downloader.requests.Session.get", return_value=_empty_response(mocker))
+    mocker.patch("downloader.time.sleep")
+
+    downloader = MeetingDownloader()
+    meetings = downloader.get_new_public_meetings(["Not A Real Playlist"])
+
+    assert meetings == []
+    mock_get.assert_not_called()
