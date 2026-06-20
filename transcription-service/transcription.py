@@ -5,6 +5,7 @@ import psycopg
 from identification import Identifier
 from db import save_meeting, is_meeting_processed, save_speaker_embeddings
 
+import huggingface_hub
 import torch
 import whisperx
 from whisperx.diarize import DiarizationPipeline
@@ -16,6 +17,8 @@ logger = setup_logging("transcription")
 os.environ["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] = "1"
 
 HF_TOKEN = os.environ.get("HF_TOKEN", "")
+if HF_TOKEN:
+    huggingface_hub.login(token=HF_TOKEN)
 MIN_SPEAKERS = int(os.environ.get("MIN_SPEAKERS", 5))
 MAX_SPEAKERS = int(os.environ.get("MAX_SPEAKERS", 18))
 MODELS_DIR = os.environ.get("MODELS_DIR", "models")
@@ -52,7 +55,7 @@ def transcription(meeting_name: str):
     del model_a; gc.collect()
 
     logger.info("Assigning speaker labels")
-    diarize_model = DiarizationPipeline(use_auth_token=HF_TOKEN, device=DEVICE)
+    diarize_model = DiarizationPipeline(device=DEVICE)
     diarize_segments, speaker_embeddings = diarize_model(
         audio,
         min_speakers=MIN_SPEAKERS,
