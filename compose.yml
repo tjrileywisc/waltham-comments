@@ -75,6 +75,8 @@ services:
       DATA_DIR: ${DATA_DIR}
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       EMBEDDINGS_SERVICE_URL: http://embeddings-service:8001
+      ADMIN_USER: ${ADMIN_USER}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
     ports:
       - "8000:8000"
     depends_on:
