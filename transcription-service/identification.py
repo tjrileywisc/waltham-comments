@@ -1,84 +1,52 @@
-# diarization just assigns speakers to segments of audio;
-# to actually assign and identity across meetings, we need to get a persistent idea of a speaker embedding
-
-import pickle
 import numpy as np
 from numpy.typing import NDArray
-
 from typing import Dict, List
-
+from collections import defaultdict
 from sklearn.metrics.pairwise import cosine_similarity
 
+
 class Identifier:
-
-    DB_PATH = "data/speaker_db.pkl"
-
-    # cosine similarity threshold for matching speakers
     SIMILARITY_THRESHOLD = 0.7
-    # the speaker we'll use for anyone not expected to speak regularly
     DEFAULT_SPEAKER = "DEFAULT"
 
-    def __init__(self, database: Dict[str, NDArray[np.float64]]=dict()):
-        """Identifier constructor
-
-        Args:
-            database (Dict[str, NDArray[np.float64]], optional): a database to pass. If not provided, the default will be loaded from the filesystem.
-        """
-        if not database:
-            self.load_db()
-        else:
-            self.database = database
-
-    @staticmethod
-    def save_db(speaker_embeddings: Dict[str, NDArray[np.float64]]):
-        pickle.dump(speaker_embeddings, open(Identifier.DB_PATH, "wb"))
-
-    def load_db(self):
-        # load existing database
-        with open(Identifier.DB_PATH, "rb") as f:
-            self.database = pickle.load(f)
-
-    def __call__(self, speaker_embeddings: Dict[str, NDArray[np.float64]]) -> List[str]:
-        """Use cosine similarity to match a known speaker name against embedding vectors
-        found in the incoming data
-
-        Args:
-            speaker_embeddings (Dict[str, NDArray[np.float64]]): incoming data
-
-        Returns:
-            List[str]: a list of speakers. Poor quality matches will be assigned
-            the default speaker name.
-        """
-
-        embeddings_arr = np.array(
-            list(
-                speaker_embeddings.values()
+    def __call__(
+        self,
+        conn,
+        speaker_embeddings: Dict[str, NDArray[np.float64]],
+    ) -> List[tuple[str, float | None]]:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT s.speaker_name, se.embedding_vec::text
+                FROM speaker_embeddings se
+                JOIN speakers s ON s.id = se.speaker_id
+                WHERE se.speaker_id IS NOT NULL
+                """
             )
-        )
+            rows = cur.fetchall()
 
-        database_keys = list(self.database.keys())
-        database_embeddings_arr = np.array(
-            list(
-                self.database.values()
+        if not rows:
+            return [(self.DEFAULT_SPEAKER, None)] * len(speaker_embeddings)
+
+        speaker_vecs: dict[str, list] = defaultdict(list)
+        for name, emb_text in rows:
+            speaker_vecs[name].append(
+                [float(x) for x in emb_text.strip("[]").split(",")]
             )
-        )
 
-        # results shape should be (examples x known speakers)
-        results = cosine_similarity(embeddings_arr, database_embeddings_arr)
+        db_names = list(speaker_vecs.keys())
+        db_embeddings = np.array([
+            np.mean(speaker_vecs[name], axis=0) for name in db_names
+        ])
 
-        # get the column index of the best match to the database in each row,
-        # replacing with the default if we didn't meet the threshold
-        best = np.argmax(results, axis=1)
+        incoming = np.array(list(speaker_embeddings.values()))
+        results = cosine_similarity(incoming, db_embeddings)
+        best_idx = np.argmax(results, axis=1)
+        best_scores = results[np.arange(len(results)), best_idx]
 
-        max_scores = results[np.arange(len(results)), best]
-
-        speakers = [
-            (
-                database_keys[i]
-                if (i < len(database_keys)) and (max_scores[i] >= Identifier.SIMILARITY_THRESHOLD)
-                else Identifier.DEFAULT_SPEAKER
-            )
+        return [
+            (db_names[best_idx[i]], float(best_scores[i]))
+            if best_scores[i] >= self.SIMILARITY_THRESHOLD
+            else (self.DEFAULT_SPEAKER, None)
             for i in range(len(speaker_embeddings))
         ]
-
-        return speakers

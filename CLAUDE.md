@@ -2,6 +2,11 @@
 
 Automated pipeline that downloads Waltham city council meeting videos, transcribes and diarizes them with WhisperX, and serves them through a searchable web UI.
 
+## Development requirements
+
+- add types
+- add and maintain docstrings on methods
+
 ## Architecture
 
 Four containerized services, orchestrated by `compose.yml`:

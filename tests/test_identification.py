@@ -1,60 +1,60 @@
-import pytest
 import numpy as np
-
+import pytest
+from helpers import make_mock_conn
 from identification import Identifier
 
-def test_identifier_no_matches():
-    db_vector = np.zeros((128), np.float64)
-    db_vector[0] = 1.0
 
-    test_vector = np.zeros_like(db_vector)
-    test_vector[-1] = 1.0
-    
-    test_embeddings = {
-        "SPEAKER_00" : test_vector
-    }
-    
+def test_returns_default_when_no_labeled_embeddings():
+    identifier = Identifier()
+    result = identifier(make_mock_conn(fetchall_results=[[]]), {"SPEAKER_0": np.array([1.0, 0.0])})
+    assert result == [("DEFAULT", None)]
 
-    identifier = Identifier({"SPEAKER_00": db_vector})
-    result = identifier(test_embeddings)
 
-    assert result[0] == Identifier.DEFAULT_SPEAKER
+def test_matches_speaker_above_threshold():
+    conn = make_mock_conn(fetchall_results=[[("Alice", "[1.0,0.0]")]])
+    identifier = Identifier()
+    result = identifier(conn, {"SPEAKER_0": np.array([1.0, 0.0])})
+    name, score = result[0]
+    assert name == "Alice"
+    assert score == pytest.approx(1.0)
 
-def test_identifier_more_speakers_in_db():
-    db_vectors = np.eye(10, dtype=np.float64)
-    db = {"DB_0" + str(i) : db_vectors[i] for i in range(len(db_vectors))}
 
-    test_vectors = db_vectors.copy()[:5]
-    test_data = {"SPEAKER_0" + str(i) : test_vectors[i] for i in range(len(test_vectors))}
+def test_returns_default_when_below_threshold():
+    conn = make_mock_conn(fetchall_results=[[("Alice", "[1.0,0.0]")]])
+    identifier = Identifier()
+    result = identifier(conn, {"SPEAKER_0": np.array([0.0, 1.0])})
+    name, score = result[0]
+    assert name == "DEFAULT"
+    assert score is None
 
-    identifier = Identifier(db)
 
-    result = identifier(test_data)
+def test_picks_best_match_among_multiple_speakers():
+    conn = make_mock_conn(fetchall_results=[[("Alice", "[1.0,0.0]"), ("Bob", "[0.0,1.0]")]])
+    identifier = Identifier()
+    result = identifier(conn, {"SPEAKER_0": np.array([0.9, 0.1])})
+    name, score = result[0]
+    assert name == "Alice"
+    assert score > 0.7
 
-    assert len(result) == 5
 
-    # they should all match the db perfectly
-    for i, speaker in enumerate(result):
-        assert speaker == "DB_0" + str(i)
+def test_multiple_clusters_matched_independently():
+    conn = make_mock_conn(fetchall_results=[[("Alice", "[1.0,0.0]"), ("Bob", "[0.0,1.0]")]])
+    identifier = Identifier()
+    result = identifier(conn, {
+        "SPEAKER_0": np.array([1.0, 0.0]),
+        "SPEAKER_1": np.array([0.0, 1.0]),
+    })
+    assert result[0][0] == "Alice"
+    assert result[1][0] == "Bob"
 
-def test_identifier_more_speakers_in_meeting():
 
-    db_vectors = np.eye(10, dtype=np.float64)
-    db_vectors = db_vectors[:5]
-    db = {"DB_0" + str(i) : db_vectors[i] for i in range(len(db_vectors))}
-
-    test_vectors = np.eye(10, dtype=np.float64)
-    test_data = {"SPEAKER_0" + str(i) : test_vectors[i] for i in range(len(test_vectors))}
-
-    identifier = Identifier(db)
-
-    result = identifier(test_data)
-
-    assert len(result) == 10
-
-    # expecting the first few to match perfectly, then the rest to be mapped to the default
-    for i, speaker in enumerate(result):
-        if i < 5:
-            assert speaker == "DB_0" + str(i)
-        else:
-            assert speaker == Identifier.DEFAULT_SPEAKER
+def test_centroid_averages_multiple_embeddings_per_speaker():
+    # Alice has two embeddings; their centroid points toward [1, 0], so [0.9, 0.1] matches her
+    conn = make_mock_conn(fetchall_results=[[
+        ("Alice", "[1.0,0.0]"),
+        ("Alice", "[0.8,0.2]"),
+        ("Bob",   "[0.0,1.0]"),
+    ]])
+    identifier = Identifier()
+    result = identifier(conn, {"SPEAKER_0": np.array([0.9, 0.1])})
+    assert result[0][0] == "Alice"

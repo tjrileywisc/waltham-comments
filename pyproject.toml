@@ -6,6 +6,8 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "bs4>=0.0.2",
+    "fastapi>=0.128.1",
+    "httpx>=0.28.0",
     "huggingface-hub[hf-xet]>=0.36.0",
     "lxml[html-clean]>=6.0.2",
     "playwright>=1.57.0",
@@ -26,20 +28,18 @@ dependencies = [
     "torchcodec>=0.7.0",
     "tqdm>=4.67.1",
     "whisperx>=3.7.6",
+    "httpx2>=2.4.0",
 ]
 
 [[tool.uv.index]]
-name = "pytorch-cpu"
-url = "https://download.pytorch.org/whl/cpu"
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
 explicit = true
 
 [tool.uv.sources]
-torch = [
-  {index = "pytorch-cpu"},
-]
-torchvision = [
-  {index = "pytorch-cpu"},
-]
+torch = [{ index = "pytorch-cu128" }]
+torchaudio = [{ index = "pytorch-cu128" }]
+torchvision = [{ index = "pytorch-cu128" }]
 
 [tool.pytest.ini_options]
 addopts = "--cov=meeting-downloader --cov=transcription-service --cov=embeddings-service --cov-report=term-missing --cov-report=xml:coverage.xml -n auto"

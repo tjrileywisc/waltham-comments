@@ -48,22 +48,25 @@ class MeetingDownloader:
         self.session.mount("http://", adapter)
         self.session.headers.update(WCAC_HEADERS)
 
-    def get_new_public_meetings(self, playlists: list[str] | None) -> list[str]:
+    def get_new_public_meetings(self, playlists: list[str] | None = None) -> list[PublicMeeting]:
         """Queries the WCAC site for new meetings
 
         Args:
-            playlists (list | None): A list of playlist names to filter on. If None, all playlists are checked.
+            playlists: Playlist names to check. If None, all playlists from settings are checked.
 
         Returns:
             list: a list of PublicMeeting objects
         """
+        active_playlists = (
+            {k: v for k, v in self.playlists.items() if k in playlists}
+            if playlists is not None
+            else self.playlists
+        )
+
         public_meetings = []
 
-        if playlists is not None:
-            # filter
-            self.playlists = {k: v for k, v in self.playlists.items() if k in playlists}
-
-        for org_name, playlist_id in self.playlists.items():
+        for org_name, playlist_id in active_playlists.items():
+            logger.info(f"Checking meetings for {org_name}")
 
             self.session.headers.update({
                 "Referer": f"https://videoplayer.telvue.com/player/{self.player_id}/playlists/{playlist_id}"
@@ -105,7 +108,7 @@ class MeetingDownloader:
                     logger.warning(f"skipping '{meeting_name}', which doesn't have a recognized date format")
                     continue
 
-                public_meetings.insert(n, PublicMeeting(video_id, meeting_name, self.playlists[org_name]))
+                public_meetings.insert(n, PublicMeeting(video_id, meeting_name, playlist_id))
 
             # TODO: someday, just queue this work up
             if len(public_meetings) > 5:
@@ -240,20 +243,25 @@ class MeetingDownloader:
                 pbar.update(duration)
             pbar.close()
 
-            # write concat file for ffmpeg
-            concat_file = os.path.join(ts_dir, "concat.txt")
-            with open(concat_file, "w") as f:
+            # Binary-concatenate segments into a single TS file. MPEG-TS is a
+            # byte-stream format (fixed 188-byte packets), so this is lossless and
+            # avoids the concat demuxer whose reset_timestamps option is not
+            # available in all ffmpeg builds.
+            combined_ts = os.path.join(ts_dir, "combined.ts")
+            with open(combined_ts, "wb") as out:
                 for i in range(len(segments)):
-                    f.write(f"file '{os.path.abspath(os.path.join(ts_dir, f'seg-{i:04d}.ts'))}'\n")
+                    seg_file = os.path.join(ts_dir, f"seg-{i:04d}.ts")
+                    with open(seg_file, "rb") as seg:
+                        out.write(seg.read())
 
-            # mux with ffmpeg locally - no network calls
+            # Remux to MP4; -avoid_negative_ts make_zero shifts all timestamps so
+            # the stream starts at 0, keeping WhisperX timestamps in sync with
+            # video.currentTime in the browser.
             cmd = [
                 "ffmpeg", "-y",
-                "-f", "concat",
-                "-safe", "0",
-                "-i", concat_file,
+                "-i", combined_ts,
                 "-c", "copy",
-                "-reset_timestamps", "1",
+                "-avoid_negative_ts", "make_zero",
                 output_file
             ]
             result = subprocess.run(cmd, capture_output=True, text=True)
