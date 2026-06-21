@@ -8,6 +8,50 @@ from typing import Hashable
 EMBEDDINGS_SERVICE_URL = os.environ.get("EMBEDDINGS_SERVICE_URL", "http://embeddings-service:8001")
 
 
+def claim_pending_job(conn, /) -> tuple[int, str, dict] | None:
+    """Atomically claim the oldest pending job.
+
+    Uses FOR UPDATE SKIP LOCKED so concurrent workers never double-claim.
+    Returns (job_id, job_type, payload) or None if the queue is empty.
+    """
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE jobs SET status = 'running', started_at = NOW()
+            WHERE id = (
+                SELECT id FROM jobs WHERE status = 'pending'
+                ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED
+            )
+            RETURNING id, job_type, payload
+            """
+        )
+        row = cur.fetchone()
+    conn.commit()
+    if row is None:
+        return None
+    return (row[0], row[1], row[2])
+
+
+def complete_job(conn, job_id: int) -> None:
+    """Mark a job as successfully completed."""
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE jobs SET status = 'done', completed_at = NOW() WHERE id = %s",
+            (job_id,),
+        )
+    conn.commit()
+
+
+def fail_job(conn, job_id: int, error: str) -> None:
+    """Mark a job as failed and record the error message."""
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE jobs SET status = 'failed', error = %s, completed_at = NOW() WHERE id = %s",
+            (error, job_id),
+        )
+    conn.commit()
+
+
 def build_window_text(segments: list[dict], current_idx: int) -> str:
     current = segments[current_idx]
     if current["end"] - current["start"] >= 5.0:

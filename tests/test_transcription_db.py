@@ -1,7 +1,11 @@
 import pytest
 from unittest.mock import MagicMock
 from helpers import make_mock_conn
-from db import build_window_text, extract_meeting_type, extract_meeting_date, extract_meeting_part, is_meeting_processed, save_meeting
+from db import (
+    build_window_text, extract_meeting_type, extract_meeting_date,
+    extract_meeting_part, is_meeting_processed, save_meeting,
+    claim_pending_job, complete_job, fail_job,
+)
 
 
 def test_build_window_text_includes_preceding_segments_within_window():
@@ -180,3 +184,28 @@ def test_save_speaker_embeddings_passes_none_speaker_id_for_unmatched(mocker):
     params = mock_cur.execute.call_args_list[0].args[1]
     assert params[0] is None   # speaker_id is None for unmatched cluster
     assert params[2] == "SPEAKER_0"
+
+
+def test_claim_pending_job_returns_none_when_queue_empty():
+    conn = make_mock_conn(fetchone_results=[None])
+    assert claim_pending_job(conn) is None
+
+
+def test_claim_pending_job_returns_job_tuple():
+    conn = make_mock_conn(fetchone_results=[(1, "relabel", {"meeting_id": 5})])
+    result = claim_pending_job(conn)
+    assert result == (1, "relabel", {"meeting_id": 5})
+
+
+def test_complete_job_issues_done_update():
+    conn = make_mock_conn()
+    complete_job(conn, job_id=1)
+    sql = conn.cursor.return_value.execute.call_args.args[0]
+    assert "done" in sql
+
+
+def test_fail_job_stores_error_message():
+    conn = make_mock_conn()
+    fail_job(conn, job_id=1, error="boom")
+    params = conn.cursor.return_value.execute.call_args.args[1]
+    assert "boom" in params
