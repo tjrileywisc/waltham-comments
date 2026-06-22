@@ -4,6 +4,7 @@ from typing import Annotated
 
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from psycopg.types.json import Json
 
 security = HTTPBasic()
 
@@ -138,6 +139,18 @@ def set_canonical(conn, embedding_id: int) -> None:
             (embedding_id,),
         )
     conn.commit()
+
+
+def enqueue_relabel_job(conn, meeting_id: int) -> int:
+    """Insert a relabel job for the given meeting and return the new job id."""
+    with conn.cursor() as cur:
+        cur.execute(
+            "INSERT INTO jobs (job_type, payload) VALUES ('relabel', %s) RETURNING id",
+            (Json({"meeting_id": meeting_id}),),
+        )
+        job_id = cur.fetchone()[0]
+    conn.commit()
+    return job_id
 
 
 def get_speakers(conn) -> list[dict]:

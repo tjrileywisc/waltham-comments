@@ -14,6 +14,7 @@ from lib.db import connect, get_transcript as db_get_transcript
 from lib.admin import (
     get_admin, get_meetings, get_clusters,
     label_cluster, set_canonical, get_speakers,
+    enqueue_relabel_job,
 )
 from lib.search import do_search
 from monitoring import setup_logging
@@ -173,6 +174,13 @@ def admin_label_cluster(meeting_id: int, cluster: str, body: LabelRequest, _=Dep
     with connect() as conn:
         label_cluster(conn, meeting_id, cluster, body.speaker_name)
     return {"ok": True}
+
+
+@app.post("/api/admin/meetings/{meeting_id}/relabel")
+def admin_relabel_meeting(meeting_id: int, _=Depends(get_admin)):
+    with connect() as conn:
+        job_id = enqueue_relabel_job(conn, meeting_id)
+    return {"job_id": job_id}
 
 
 @app.post("/api/admin/speaker-embeddings/{embedding_id}/canonical")

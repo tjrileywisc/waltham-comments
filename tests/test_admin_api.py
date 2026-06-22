@@ -77,3 +77,16 @@ def test_admin_speakers_returns_list():
     data = r.json()
     assert data[0]["speaker_name"] == "Councilor Smith"
     assert data[0]["mean_confidence"] == pytest.approx(0.81)
+
+
+def test_admin_relabel_requires_auth():
+    r = client.post("/api/admin/meetings/1/relabel")
+    assert r.status_code == 401
+
+
+def test_admin_relabel_enqueues_job():
+    mock_conn = make_mock_conn(fetchone_results=[(99,)])
+    with patch("main.connect", return_value=mock_conn):
+        r = client.post("/api/admin/meetings/1/relabel", auth=AUTH)
+    assert r.status_code == 200
+    assert r.json() == {"job_id": 99}
