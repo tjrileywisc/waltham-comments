@@ -10,7 +10,7 @@ from monitoring import setup_logging
 
 logger = setup_logging("transcription")
 
-POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL_SECONDS", 3600))
+POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL_SECONDS", 60))
 
 
 def main():
