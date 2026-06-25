@@ -174,7 +174,7 @@ class MeetingDownloader:
         """
         cmd = [
             "ffprobe",
-            "-v", "error",
+            "error",
             "-show_entries", "format=duration",
             "-of", "json",
             filepath
