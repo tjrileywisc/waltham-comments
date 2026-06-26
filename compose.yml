@@ -25,6 +25,17 @@ services:
       - 8001
     volumes:
       - C:/workspace/waltham-comments/models:/app/models
+  ollama:
+    image: ollama/ollama
+    volumes:
+      - C:/workspace/waltham-comments/models:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
   meeting-downloader:
     build:
       context: .
@@ -77,10 +88,13 @@ services:
       EMBEDDINGS_SERVICE_URL: http://embeddings-service:8001
       ADMIN_USER: ${ADMIN_USER}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      OLLAMA_URL: http://ollama:11434
+      OLLAMA_MODEL: qwen2.5:14b
     ports:
       - "8000:8000"
     depends_on:
       - postgres
+      - ollama
     volumes:
       - C:/workspace/waltham-comments/videos:/app/videos
       - C:/workspace/waltham-comments/data:/app/data
