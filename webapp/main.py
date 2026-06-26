@@ -17,7 +17,9 @@ from lib.admin import (
     enqueue_relabel_job,
 )
 from lib.search import do_search
+from lib.chat import chat as chat_rag
 from monitoring import setup_logging
+import requests as http_requests
 
 logger = setup_logging("webapp")
 
@@ -33,6 +35,24 @@ class SearchResult(BaseModel):
 
 class LabelRequest(BaseModel):
     speaker_name: str
+
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+class ChatRequest(BaseModel):
+    messages: list[ChatMessage]
+    query: str
+
+class ChatSource(BaseModel):
+    meeting_name: str
+    video_id: int | None
+    start: float
+    text: str
+
+class ChatResponse(BaseModel):
+    answer: str
+    sources: list[ChatSource]
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -145,6 +165,32 @@ def search(query: str):
             r["video_id"] = video_id
             matching.append(r)
     return matching
+
+
+@app.post("/api/chat", response_model=ChatResponse)
+def chat_endpoint(body: ChatRequest) -> ChatResponse:
+    """Accept a query and conversation history, return an LLM answer with cited sources."""
+    try:
+        result = chat_rag(
+            query=body.query,
+            messages=[m.model_dump() for m in body.messages],
+        )
+    except http_requests.exceptions.ConnectionError:
+        raise HTTPException(status_code=503, detail="Chat service is currently unavailable.")
+    except http_requests.exceptions.HTTPError:
+        raise HTTPException(status_code=502, detail="Chat service returned an error.")
+
+    name_to_id = {v["name"]: v["video_id"] for v in VIDEO_DB}
+    sources = [
+        ChatSource(
+            meeting_name=u["meeting_name"],
+            video_id=name_to_id.get(u["meeting_name"]),
+            start=u["start"],
+            text=u["text"],
+        )
+        for u in result["utterances"]
+    ]
+    return ChatResponse(answer=result["answer"], sources=sources)
 
 
 @app.get("/api/admin/meetings")
