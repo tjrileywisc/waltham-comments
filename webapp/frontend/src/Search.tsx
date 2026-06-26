@@ -1,85 +1,141 @@
-import { useEffect, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useState, useRef, useEffect } from "react";
+import { Link } from "react-router-dom";
 
-type SearchResult = {
-    video_id: number,
-    start: number,
-    meeting_name: string,
-    text: string,
+type Source = {
+    meeting_name: string;
+    video_id: number | null;
+    start: number;
+    text: string;
 };
 
+type UserMessage = { role: "user"; content: string };
+type AssistantMessage = { role: "assistant"; content: string; sources: Source[] };
+type Message = UserMessage | AssistantMessage;
+
+type ChatHistoryItem = { role: "user" | "assistant"; content: string };
+
+function formatTimestamp(seconds: number): string {
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+function SourceList({ sources }: { sources: Source[] }) {
+    const [open, setOpen] = useState(true);
+    if (sources.length === 0) return null;
+    return (
+        <div className="sources">
+            <button className="sources-toggle" onClick={() => setOpen(o => !o)}>
+                Sources ({sources.length}) {open ? "▲" : "▼"}
+            </button>
+            {open && (
+                <ul className="sources-list">
+                    {sources.map((s, i) => (
+                        <li key={i}>
+                            {s.video_id !== null ? (
+                                <Link to={`/videos?video=${s.video_id}&t=${Math.max(0, s.start - 5).toFixed(1)}`}>
+                                    {s.meeting_name} @ {formatTimestamp(s.start)}
+                                </Link>
+                            ) : (
+                                <span>{s.meeting_name} @ {formatTimestamp(s.start)}</span>
+                            )}
+                            <p className="snippet">{s.text}</p>
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </div>
+    );
+}
+
 function Search() {
-
-    const [params, setParams] = useSearchParams();
-    const [query, setQuery] = useState(() => params.get("q") ?? "");
-    const [results, setResults] = useState<SearchResult[]>([]);
-    const [loading, setLoading] = useState<boolean>(false);
+    const [messages, setMessages] = useState<Message[]>([]);
+    const [input, setInput] = useState("");
+    const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const bottomRef = useRef<HTMLDivElement>(null);
 
-    useEffect(()=> {
-        handleSearch(null);
-    }, []);
+    useEffect(() => {
+        bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, [messages]);
 
-    const handleSearch = async (e: any) => {
-        if(e !== null) {
-            // i.e user got here from clicking search
-            e.preventDefault();
-            setParams({q : query});
-        }
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!input.trim() || loading) return;
 
-        if (!query.trim()) return;
-
-        setLoading(true);
+        const query = input.trim();
+        setInput("");
         setError(null);
 
+        setMessages(prev => [...prev, { role: "user", content: query }]);
+
+        const history: ChatHistoryItem[] = messages.map(m => ({
+            role: m.role,
+            content: m.content,
+        }));
+
+        setLoading(true);
         try {
-            const response = await fetch(`/api/search?query=${encodeURIComponent(query)}`);
-            if (!response.ok) throw new Error("Search failed");
+            const response = await fetch("/api/chat", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ messages: history, query }),
+            });
+            if (!response.ok) {
+                const status = response.status;
+                throw new Error(`${status}`);
+            }
             const data = await response.json();
-            setResults(data);
+            setMessages(prev => [
+                ...prev,
+                { role: "assistant", content: data.answer, sources: data.sources },
+            ]);
         } catch (err) {
-            setError(`Something went wrong (${err}). Please try again.`);
+            const msg = err instanceof Error ? err.message : "";
+            if (msg.includes("503")) {
+                setError("Chat is currently unavailable.");
+            } else {
+                setError("Something went wrong. Please try again.");
+            }
         } finally {
             setLoading(false);
         }
     };
 
-    const formatTimeStamp = (seconds: number): string => {
-        const m = Math.floor(seconds / 60);
-        const s = Math.floor(seconds % 60);
-        return `${m}:${s.toString().padStart(2, "0")}`;
-    };
-
     return (
-        <div className="search-page">
-            <form onSubmit={handleSearch} className="search-form">
+        <div className="chat-page">
+            <div className="chat-history">
+                {messages.map((m, i) => (
+                    <div key={i} className={`chat-message chat-message--${m.role}`}>
+                        <p className="chat-bubble">{m.content}</p>
+                        {m.role === "assistant" && <SourceList sources={m.sources} />}
+                    </div>
+                ))}
+                {loading && (
+                    <div className="chat-message chat-message--assistant">
+                        <p className="chat-bubble">Thinking…</p>
+                    </div>
+                )}
+                {error && <p className="chat-error">{error}</p>}
+                <div ref={bottomRef} />
+            </div>
+            <form onSubmit={handleSubmit} className="chat-form">
                 <input
                     type="text"
-                    value={query}
-                    onChange={(e) => {
-                        setQuery(e.target.value);
-                        }
-                    }
-                    placeholder="Enter search text"
-                    className="search-input"
+                    value={input}
+                    onChange={e => setInput(e.target.value)}
+                    placeholder="Ask about Waltham city council meetings…"
+                    className="chat-input"
+                    disabled={loading}
                 />
-                <button type="submit" disabled={loading} className="search-button">
-                    {loading ? "Searching..." : "Search"}
+                <button
+                    type="submit"
+                    disabled={loading || !input.trim()}
+                    className="chat-button"
+                >
+                    Ask
                 </button>
             </form>
-
-            {error && <p className="search-error">{error}</p>}
-
-            <ul className="search-results">
-                {results.map((result, i:number) => (
-                    <li key={i} className="search-result">
-                        <Link to={`/videos?video=${result.video_id}&t=${Math.max(0, result.start - 5).toFixed(1)}`}>
-                            {result.meeting_name} @ {formatTimeStamp(result.start)}
-                        </Link>
-                        <p className="snippet">{result.text}</p>
-                    </li>
-                ))}
-            </ul>
         </div>
     );
 }
