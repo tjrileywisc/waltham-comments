@@ -33,7 +33,7 @@ Add an `ollama` service with NVIDIA GPU passthrough:
 ollama:
   image: ollama/ollama
   volumes:
-    - ollama_models:/root/.ollama
+    - C:/workspace/waltham-comments/models:/root/.ollama
   deploy:
     resources:
       reservations:
@@ -43,7 +43,7 @@ ollama:
             capabilities: [gpu]
 ```
 
-Add `ollama_models` to the top-level `volumes` block. The `webapp` service gets two new env vars: `OLLAMA_URL` (default `http://ollama:11434`) and `OLLAMA_MODEL` (default `qwen2.5:14b`).
+No new named volumes needed — the existing `models` bind mount is reused. The `webapp` service gets two new env vars: `OLLAMA_URL` (default `http://ollama:11434`) and `OLLAMA_MODEL` (default `qwen2.5:14b`).
 
 The chosen model (`qwen2.5:14b` at 4-bit quantization, ~9GB VRAM) fits comfortably within the 12GB VRAM budget.
 
