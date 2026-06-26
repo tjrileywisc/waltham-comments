@@ -8,6 +8,7 @@ type Meeting = {
   meeting_type: string;
   unlabeled_count: number;
   video_id: number | null;
+  relabel_status: string | null;
 };
 
 type SortKey = "meeting_date" | "meeting_name" | "meeting_type" | "unlabeled_count";
@@ -22,6 +23,7 @@ function AdminMeetings() {
   const [error, setError] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("meeting_date");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [relabeling, setRelabeling] = useState<number | null>(null);
 
   useEffect(() => {
     fetch("/api/admin/meetings")
@@ -32,6 +34,23 @@ function AdminMeetings() {
       .then(setMeetings)
       .catch((e: Error) => setError(e.message));
   }, []);
+
+  /**
+   * POST to the relabel endpoint for the given meeting, then update local state.
+   * @param meetingId - the meeting to relabel
+   */
+  async function handleRelabel(meetingId: number) {
+    setRelabeling(meetingId);
+    try {
+      const r = await fetch(`/api/admin/meetings/${meetingId}/relabel`, { method: "POST" });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      setMeetings((ms) =>
+        ms.map((m) => (m.id === meetingId ? { ...m, relabel_status: "pending" } : m))
+      );
+    } finally {
+      setRelabeling(null);
+    }
+  }
 
   function handleSort(key: SortKey) {
     if (key === sortKey) {
@@ -86,6 +105,18 @@ function AdminMeetings() {
               <td>{m.unlabeled_count > 0 ? m.unlabeled_count : "—"}</td>
               <td>
                 <Link to={`/admin/meetings/${m.id}/label`}>Label</Link>
+                {m.unlabeled_count > 0 && (
+                  <>
+                    {" "}
+                    <button
+                      onClick={() => handleRelabel(m.id)}
+                      disabled={relabeling === m.id}
+                    >
+                      {relabeling === m.id ? "Relabeling…" : "Relabel"}
+                    </button>
+                    {m.relabel_status && <span> ({m.relabel_status})</span>}
+                  </>
+                )}
               </td>
             </tr>
           ))}

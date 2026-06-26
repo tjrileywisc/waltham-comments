@@ -4,6 +4,7 @@ from typing import Annotated
 
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from psycopg.types.json import Json
 
 security = HTTPBasic()
 
@@ -26,10 +27,19 @@ def get_meetings(conn) -> list[dict]:
         cur.execute(
             """
             SELECT m.id, m.meeting_name, m.meeting_date, m.meeting_type,
-                   COUNT(se.id) FILTER (WHERE se.speaker_id IS NULL) AS unlabeled_count
+                   COUNT(se.id) FILTER (WHERE se.speaker_id IS NULL) AS unlabeled_count,
+                   j.status AS relabel_status
             FROM meetings m
             LEFT JOIN speaker_embeddings se ON se.meeting_id = m.id
-            GROUP BY m.id
+            LEFT JOIN LATERAL (
+                SELECT status
+                FROM jobs
+                WHERE job_type = 'relabel'
+                  AND (payload->>'meeting_id')::int = m.id
+                ORDER BY created_at DESC
+                LIMIT 1
+            ) j ON TRUE
+            GROUP BY m.id, j.status
             ORDER BY m.meeting_date DESC
             """
         )
@@ -41,6 +51,7 @@ def get_meetings(conn) -> list[dict]:
             "meeting_date": str(r[2]),
             "meeting_type": r[3],
             "unlabeled_count": r[4] or 0,
+            "relabel_status": r[5],
         }
         for r in rows
     ]
@@ -138,6 +149,18 @@ def set_canonical(conn, embedding_id: int) -> None:
             (embedding_id,),
         )
     conn.commit()
+
+
+def enqueue_relabel_job(conn, meeting_id: int) -> int:
+    """Insert a relabel job for the given meeting and return the new job id."""
+    with conn.cursor() as cur:
+        cur.execute(
+            "INSERT INTO jobs (job_type, payload) VALUES ('relabel', %s) RETURNING id",
+            (Json({"meeting_id": meeting_id}),),
+        )
+        job_id = cur.fetchone()[0]
+    conn.commit()
+    return job_id
 
 
 def get_speakers(conn) -> list[dict]:

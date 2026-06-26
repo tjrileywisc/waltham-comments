@@ -28,7 +28,7 @@ def test_admin_meetings_rejects_wrong_password():
 
 def test_admin_meetings_returns_list():
     mock_conn = make_mock_conn(
-        fetchall_results=[[(1, "City Council 1-12-26", "2026-01-12", "City Council", 2)]]
+        fetchall_results=[[(1, "City Council 1-12-26", "2026-01-12", "City Council", 2, None)]]
     )
     with patch("main.connect", return_value=mock_conn):
         r = client.get("/api/admin/meetings", auth=AUTH)
@@ -37,6 +37,16 @@ def test_admin_meetings_returns_list():
     assert len(data) == 1
     assert data[0]["meeting_name"] == "City Council 1-12-26"
     assert data[0]["unlabeled_count"] == 2
+
+
+def test_admin_meetings_includes_relabel_status():
+    mock_conn = make_mock_conn(
+        fetchall_results=[[(1, "City Council 1-12-26", "2026-01-12", "City Council", 0, "pending")]]
+    )
+    with patch("main.connect", return_value=mock_conn):
+        r = client.get("/api/admin/meetings", auth=AUTH)
+    assert r.status_code == 200
+    assert r.json()[0]["relabel_status"] == "pending"
 
 
 def test_admin_label_cluster_returns_ok():
@@ -77,3 +87,16 @@ def test_admin_speakers_returns_list():
     data = r.json()
     assert data[0]["speaker_name"] == "Councilor Smith"
     assert data[0]["mean_confidence"] == pytest.approx(0.81)
+
+
+def test_admin_relabel_requires_auth():
+    r = client.post("/api/admin/meetings/1/relabel")
+    assert r.status_code == 401
+
+
+def test_admin_relabel_enqueues_job():
+    mock_conn = make_mock_conn(fetchone_results=[(99,)])
+    with patch("main.connect", return_value=mock_conn):
+        r = client.post("/api/admin/meetings/1/relabel", auth=AUTH)
+    assert r.status_code == 200
+    assert r.json() == {"job_id": 99}
