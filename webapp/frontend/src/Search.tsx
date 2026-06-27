@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 
 type Source = {
     meeting_name: string;
+    speaker_name: string;
     video_id: number | null;
     start: number;
     text: string;
@@ -39,7 +40,7 @@ function SourceList({ sources }: { sources: Source[] }) {
                             ) : (
                                 <span>{s.meeting_name} @ {formatTimestamp(s.start)}</span>
                             )}
-                            <p className="snippet">{s.text}</p>
+                            <p className="snippet">{s.speaker_name}: {s.text}</p>
                         </li>
                     ))}
                 </ul>

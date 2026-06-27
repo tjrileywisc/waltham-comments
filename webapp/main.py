@@ -46,6 +46,7 @@ class ChatRequest(BaseModel):
 
 class ChatSource(BaseModel):
     meeting_name: str
+    speaker_name: str
     video_id: int | None
     start: float
     text: str
@@ -184,6 +185,7 @@ def chat_endpoint(body: ChatRequest) -> ChatResponse:
     sources = [
         ChatSource(
             meeting_name=u["meeting_name"],
+            speaker_name=u["speaker_name"],
             video_id=name_to_id.get(u["meeting_name"]),
             start=u["start"],
             text=u["text"],
