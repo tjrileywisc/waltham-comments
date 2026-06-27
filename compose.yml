@@ -29,6 +29,10 @@ services:
     image: ollama/ollama
     volumes:
       - C:/workspace/waltham-comments/models:/root/.ollama
+      - ./ollama_init.sh:/usr/bin/ollama_init.sh
+    entrypoint: ["/usr/bin/ollama_init.sh"]
+    environment:
+      - OLLAMA_KEEP_ALIVE=-1
     deploy:
       resources:
         reservations:
@@ -89,7 +93,7 @@ services:
       ADMIN_USER: ${ADMIN_USER}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       OLLAMA_URL: http://ollama:11434
-      OLLAMA_MODEL: qwen2.5:14b
+      OLLAMA_MODEL: gemma4:12b
     ports:
       - "8000:8000"
     depends_on:
