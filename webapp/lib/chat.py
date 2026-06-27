@@ -4,13 +4,15 @@ import requests
 from lib.search import do_search, UtteranceResult
 
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://ollama:11434")
-OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen2.5:14b")
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "gemma4:12b")
 
 SYSTEM_PROMPT = (
     "You are an assistant that answers questions about Waltham, MA city council meetings. "
     "Answer using ONLY the provided context from meeting transcripts. "
     "Always cite the speaker's name and meeting name when referencing information. "
-    "If the provided context does not contain relevant information, say so clearly rather than speculating."
+    "If the provided context does not contain relevant information to answer the question, "
+    "begin your response with the exact token [NO_CONTEXT] and then briefly say you couldn't find anything relevant. "
+    "Otherwise, do NOT include [NO_CONTEXT] in your response."
 )
 
 type ChatMessage = dict[str, str]
@@ -48,4 +50,7 @@ def chat(query: str, messages: list[ChatMessage]) -> ChatResult:
     resp.raise_for_status()
 
     answer = resp.json()["message"]["content"]
+    if answer.startswith("[NO_CONTEXT]"):
+        answer = answer[len("[NO_CONTEXT]"):].lstrip()
+        utterances = []
     return {"answer": answer, "utterances": utterances}
