@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import Markdown from 'react-markdown';
 import { Link } from "react-router-dom";
 
 type Source = {
@@ -108,7 +109,9 @@ function Search() {
             <div className="chat-history">
                 {messages.map((m, i) => (
                     <div key={i} className={`chat-message chat-message--${m.role}`}>
-                        <p className="chat-bubble">{m.content}</p>
+                        <p className="chat-bubble">
+                            <Markdown>{m.content}</Markdown>
+                        </p>
                         {m.role === "assistant" && <SourceList sources={m.sources} />}
                     </div>
                 ))}

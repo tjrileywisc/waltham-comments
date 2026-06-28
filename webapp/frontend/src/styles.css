@@ -155,3 +155,85 @@ table th {
   font-size: 0.875rem;
   margin: 0;
 }
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+  }
+
+  body {
+    background: #121212;
+    color: #e0e0e0;
+  }
+
+  a {
+    color: #7ab3f5;
+  }
+
+  a:visited {
+    color: #b39ddb;
+  }
+
+  .navbar {
+    background: #1e1e1e;
+    border-bottom: 1px solid #333;
+  }
+
+  table td,
+  table th {
+    border-color: #444;
+  }
+
+  table th {
+    background: #1e1e1e;
+  }
+
+  table tr:nth-child(even) {
+    background: #1a1a1a;
+  }
+
+  .chat-message--user .chat-bubble {
+    background: #1558b0;
+  }
+
+  .chat-message--assistant .chat-bubble {
+    background: #2a2a2a;
+    color: #e0e0e0;
+  }
+
+  .sources-toggle {
+    color: #aaa;
+  }
+
+  .snippet {
+    color: #aaa;
+  }
+
+  .chat-form {
+    border-top-color: #333;
+  }
+
+  .chat-input {
+    background: #1e1e1e;
+    color: #e0e0e0;
+    border-color: #444;
+  }
+
+  .chat-input::placeholder {
+    color: #777;
+  }
+
+  .chat-button {
+    background: #1558b0;
+  }
+
+  .chat-error {
+    color: #f28b82;
+  }
+
+  input, select, textarea, button {
+    background: #1e1e1e;
+    color: #e0e0e0;
+    border-color: #444;
+  }
+}
