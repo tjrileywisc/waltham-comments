@@ -2,9 +2,15 @@ import os
 import psycopg
 
 
-def connect():
+def connect() -> psycopg.Connection:
     return psycopg.connect(os.environ["DATABASE_URL"])
 
+def readonly_connect() -> psycopg.Connection:
+
+    POSTGRES_READONLY_USER = os.environ["POSTGRES_READONLY_USER"]
+    POSTGRES_READONLY_PASSWORD = os.environ["POSTGRES_READONLY_PASSWORD"]
+    POSTGRES_DB = os.environ["POSTGRES_DB"]
+    return psycopg.connect(f"postgresql://{POSTGRES_READONLY_USER}:{POSTGRES_READONLY_PASSWORD}@postgres:5432/{POSTGRES_DB}")
 
 def get_transcript(conn, meeting_name: str) -> list[dict]:
     with conn.cursor() as cur:

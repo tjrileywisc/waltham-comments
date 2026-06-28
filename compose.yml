@@ -90,6 +90,9 @@ services:
     image: comments-web
     environment:
       DATA_DIR: ${DATA_DIR}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_READONLY_USER: ${POSTGRES_READONLY_USER}
+      POSTGRES_READONLY_PASSWORD: ${POSTGRES_READONLY_PASSWORD}
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       EMBEDDINGS_SERVICE_URL: http://embeddings-service:8001
       ADMIN_USER: ${ADMIN_USER}

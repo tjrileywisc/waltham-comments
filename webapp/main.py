@@ -17,7 +17,7 @@ from lib.admin import (
     enqueue_relabel_job,
 )
 from lib.search import do_search
-from lib.chat import chat as chat_rag
+from lib.chat import run_chat
 from monitoring import setup_logging
 import requests as http_requests
 
@@ -172,9 +172,9 @@ def search(query: str):
 def chat_endpoint(body: ChatRequest) -> ChatResponse:
     """Accept a query and conversation history, return an LLM answer with cited sources."""
     try:
-        result = chat_rag(
+        result = run_chat(
             query=body.query,
-            messages=[m.model_dump() for m in body.messages],
+            prev_messages=[m.model_dump() for m in body.messages],
         )
     except http_requests.exceptions.ConnectionError:
         raise HTTPException(status_code=503, detail="Chat service is currently unavailable.")
