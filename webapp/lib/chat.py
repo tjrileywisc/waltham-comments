@@ -2,7 +2,7 @@ import os
 from monitoring import setup_logging
 import json
 from lib.search import UtteranceResult
-from lib.tools import get_schemas, execute_sql, get_video_ids
+from lib.tools import get_schemas, execute_sql, get_video_ids, vector_search
 from ollama import ChatResponse, Client, Message
 
 logger = setup_logging("webapp")
@@ -13,16 +13,14 @@ OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "gemma4:12b")
 SYSTEM_PROMPT = (
     """
     You are an assistant that answers questions about Waltham, MA city council meetings.
-    You have access to a read-only account in a postgres database a
-    `execute_sql` function tool to write your own queries. The relevant table schemas are provided to you.
-    You will be limited to 10 back and forth tool calls. When running the 'execute_sql' function, be sure you limit utterance results
+    You have access to a read-only account in a postgres database. The relevant table schemas are provided to you.
+    You will be limited to 10 back and forth tool calls, and thinking cycles (when you hit the limit, you will be
+    told to wrap it up with what you have). When running the 'execute_sql' function, be sure you limit utterance results
     to 50 or less.
     
     If you need to produce a link to a video timestamp, use this format:
     [MEETING @ MM:SS](/videos?video=VIDEO_ID&t=START_SECONDS)
-    
-    There is a `get_video_ids` tool that returns a map of the meeting name to a video id.
-    
+
     Produce output in markdown format.
 
     Answer using ONLY the provided context from meeting transcripts.
@@ -52,14 +50,17 @@ def run_chat(query: str, prev_messages: list[Message]) -> ChatResult:
     """Run the RAG pipeline: retrieve context, build prompt, call Ollama, return answer + sources."""
     
     client = Client(OLLAMA_URL)
-    
     available_functions = {
         execute_sql.__name__: execute_sql,
-        get_video_ids.__name__: get_video_ids
+        get_video_ids.__name__: get_video_ids,
+        vector_search.__name__: vector_search,
     }
 
     schema = get_schemas()
     system_content = SYSTEM_PROMPT + f"\n\nDatabase schema:\n{schema}"
+    
+    # TODO:
+    # force summary if prev_messages is too big?
 
     ollama_messages = [
         {"role": "system", "content": system_content},
@@ -77,7 +78,7 @@ def run_chat(query: str, prev_messages: list[Message]) -> ChatResult:
         response: ChatResponse = client.chat(
             model=OLLAMA_MODEL,
             messages=ollama_messages,
-            tools=[execute_sql, get_video_ids],
+            tools=[execute_sql, get_video_ids, vector_search],
             think=True,
             options={"num_ctx": 16384},
         )
@@ -106,10 +107,14 @@ def run_chat(query: str, prev_messages: list[Message]) -> ChatResult:
                         # The model shouldn't be allowed to fail more tool calls
                         break
 
-                    if tc.function.name == execute_sql.__name__ and isinstance(result, list):
+                    if isinstance(result, list):
                         for row in result:
-                            if isinstance(row, dict) and _utterance_keys.issubset(row.keys()):
+                            if not isinstance(row, dict):
+                                continue
+                            if _utterance_keys.issubset(row.keys()):
                                 utterances.append({**row, "start": row["start_time"]})
+                            elif tc.function.name == vector_search.__name__:
+                                utterances.append(row)
 
             if not failed_call:
                 TOOL_LIMIT -= 1

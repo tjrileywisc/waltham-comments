@@ -1,6 +1,7 @@
 
 from lib.db import readonly_connect
 from lib.state import get_video_ids
+from lib.search import vector_search
 
 def get_schemas() -> str:
     """Return a formatted summary of all public tables and their columns, suitable for inclusion in a prompt."""
