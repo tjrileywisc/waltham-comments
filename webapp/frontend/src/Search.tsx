@@ -109,9 +109,9 @@ function Search() {
             <div className="chat-history">
                 {messages.map((m, i) => (
                     <div key={i} className={`chat-message chat-message--${m.role}`}>
-                        <p className="chat-bubble">
+                        <div className="chat-bubble">
                             <Markdown>{m.content}</Markdown>
-                        </p>
+                        </div>
                         {m.role === "assistant" && <SourceList sources={m.sources} />}
                     </div>
                 ))}

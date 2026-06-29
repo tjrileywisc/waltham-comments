@@ -79,7 +79,14 @@ table th {
   margin: 0;
   padding: 10px 14px;
   border-radius: 8px;
-  white-space: pre-wrap;
+}
+
+.chat-bubble > :first-child {
+  margin-top: 0;
+}
+
+.chat-bubble > :last-child {
+  margin-bottom: 0;
 }
 
 .chat-message--user .chat-bubble {
