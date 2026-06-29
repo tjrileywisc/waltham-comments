@@ -13,7 +13,7 @@ OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "gemma4:12b")
 SYSTEM_PROMPT = (
     """
     You are an assistant that answers questions about Waltham, MA city council meetings.
-    You have access to a read-only account in a postgres database and a
+    You have access to a read-only account in a postgres database a
     `execute_sql` function tool to write your own queries. The relevant table schemas are provided to you.
     You will be limited to 10 back and forth tool calls. When running the 'execute_sql' function, be sure you limit utterance results
     to 50 or less.
@@ -68,6 +68,7 @@ def run_chat(query: str, prev_messages: list[Message]) -> ChatResult:
     ]
     
     TOOL_LIMIT = 10
+    THINK_LIMIT = 3
     answer = None
     utterances: list[UtteranceResult] = []
     _utterance_keys = {"text", "speaker_name", "meeting_name", "start_time"}
@@ -76,13 +77,18 @@ def run_chat(query: str, prev_messages: list[Message]) -> ChatResult:
         response: ChatResponse = client.chat(
             model=OLLAMA_MODEL,
             messages=ollama_messages,
-            tools=[execute_sql],
+            tools=[execute_sql, get_video_ids],
+            think=True,
+            options={"num_ctx": 16384},
         )
 
         ollama_messages.append(response.message)
 
-        failed_call = False
+        if response.message.thinking:
+            logger.debug(f"Thinking: {response.message.thinking}")
+
         if response.message.tool_calls:
+            failed_call = False
             for tc in response.message.tool_calls:
                 if tc.function.name in available_functions:
                     try:
@@ -93,22 +99,44 @@ def run_chat(query: str, prev_messages: list[Message]) -> ChatResult:
                         failed_call = True
                         logger.warning(f"Function call {tc.function.name} failed: {e}")
                     finally:
-                        content = json.dumps(result, default=str)[:8000] if isinstance(result, (list, dict)) else str(result)
-                        ollama_messages.append({'role': 'tool', 'tool_name': tc.function.name, 'content': content})
+                        tool_content = json.dumps(result, default=str)[:8000] if isinstance(result, (list, dict)) else str(result)
+                        ollama_messages.append({'role': 'tool', 'tool_name': tc.function.name, 'content': tool_content})
 
                     if failed_call:
+                        # The model shouldn't be allowed to fail more tool calls
                         break
 
                     if tc.function.name == execute_sql.__name__ and isinstance(result, list):
                         for row in result:
                             if isinstance(row, dict) and _utterance_keys.issubset(row.keys()):
                                 utterances.append({**row, "start": row["start_time"]})
+
             if not failed_call:
                 TOOL_LIMIT -= 1
+
         else:
-            answer = response.message.content
-            logger.debug(f"Final response message: {response.message}")
-            break
+            # No tool calls — model is either thinking, done, or stuck
+            if response.message.thinking:
+                THINK_LIMIT -= 1
+                if THINK_LIMIT == 0:
+                    logger.warning("Think limit reached; prompting model to wrap up")
+                    ollama_messages.append({
+                        "role": "user",
+                        "content": "Please wrap up and provide your answer now using what you have gathered so far. Do not make any further tool calls.",
+                    })
+                elif THINK_LIMIT < 0:
+                    answer = response.message.content
+                    logger.debug(f"Think limit exhausted; accepting content: {repr(answer)}")
+                    break
+
+            elif response.message.content:
+                answer = response.message.content
+                logger.debug(f"Final answer: {repr(answer)}")
+                break
+
+            else:
+                logger.warning("Empty response from model")
+                TOOL_LIMIT -= 1
 
     if not answer:
         answer = ""
