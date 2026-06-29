@@ -18,6 +18,7 @@ from lib.admin import (
 )
 from lib.search import do_search
 from lib.chat import run_chat
+from lib import state
 from monitoring import setup_logging
 import requests as http_requests
 
@@ -66,9 +67,8 @@ async def lifespan(app: FastAPI):
         backend.apply_migrations(backend.to_apply(migrations))
     logger.info("Database migrations applied.")
 
-    global VIDEO_DB
     files = os.listdir(os.environ["DATA_DIR"] + "/videos")
-    VIDEO_DB = [
+    state.VIDEO_DB = [
         {"video_id": i, "name": f.replace(".mp4", "")}
         for i, f in enumerate(files)
     ]
@@ -91,11 +91,10 @@ if Path("./frontend/dist/assets").exists():
         name="static"
     )
 
-VIDEO_DB = list()
 
 @app.get("/api/transcript/{video_id}")
 def get_transcript(video_id: int):
-    name = VIDEO_DB[video_id]["name"]
+    name = state.VIDEO_DB[video_id]["name"]
     with connect() as conn:
         rows = db_get_transcript(conn, name)
     if not rows:
@@ -105,7 +104,7 @@ def get_transcript(video_id: int):
 
 @app.get("/api/video/{video_id}")
 def get_video(video_id: int, request: Request) -> StreamingResponse:
-    path = os.environ['DATA_DIR'] + "/videos/" + VIDEO_DB[video_id]["name"] + ".mp4"
+    path = os.environ['DATA_DIR'] + "/videos/" + state.VIDEO_DB[video_id]["name"] + ".mp4"
 
     video_path = Path(path)
     if not video_path.exists:
@@ -142,7 +141,7 @@ def get_video(video_id: int, request: Request) -> StreamingResponse:
 
 @app.get("/api/videos", response_model=list[VideoSummary])
 def get_videos():
-    return VIDEO_DB
+    return state.VIDEO_DB
 
 
 @app.get("/about")
@@ -157,7 +156,7 @@ def healthcheck() -> int:
 @app.get("/api/search", response_model=list[SearchResult])
 def search(query: str):
     results = do_search(query)
-    name_to_id = {v["name"]: v["video_id"] for v in VIDEO_DB}
+    name_to_id = state.get_video_ids()
     matching = []
     for r in results:
         video_id = name_to_id.get(r["meeting_name"])
@@ -181,7 +180,7 @@ def chat_endpoint(body: ChatRequest) -> ChatResponse:
     except http_requests.exceptions.HTTPError:
         raise HTTPException(status_code=502, detail="Chat service returned an error.")
 
-    name_to_id = {v["name"]: v["video_id"] for v in VIDEO_DB}
+    name_to_id = state.get_video_ids()
     sources = [
         ChatSource(
             meeting_name=u["meeting_name"],
@@ -197,7 +196,7 @@ def chat_endpoint(body: ChatRequest) -> ChatResponse:
 
 @app.get("/api/admin/meetings")
 def admin_meetings(_=Depends(get_admin)):
-    name_to_video_id = {v["name"]: v["video_id"] for v in VIDEO_DB}
+    name_to_video_id = state.get_video_ids()
     with connect() as conn:
         meetings = get_meetings(conn)
     for m in meetings:
@@ -207,7 +206,7 @@ def admin_meetings(_=Depends(get_admin)):
 
 @app.get("/api/admin/meetings/{meeting_id}/clusters")
 def admin_meeting_clusters(meeting_id: int, _=Depends(get_admin)):
-    name_to_video_id = {v["name"]: v["video_id"] for v in VIDEO_DB}
+    name_to_video_id = state.get_video_ids()
     with connect() as conn:
         clusters = get_clusters(conn, meeting_id)
         with conn.cursor() as cur:

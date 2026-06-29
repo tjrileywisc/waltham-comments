@@ -1,7 +1,8 @@
 import os
 from monitoring import setup_logging
 import json
-from lib.search import UtteranceResult, execute_sql, get_schemas  # get_schemas used at request time
+from lib.search import UtteranceResult
+from lib.tools import get_schemas, execute_sql, get_video_ids
 from ollama import ChatResponse, Client, Message
 
 logger = setup_logging("webapp")
@@ -16,6 +17,11 @@ SYSTEM_PROMPT = (
     `execute_sql` function tool to write your own queries. The relevant table schemas are provided to you.
     You will be limited to 10 back and forth tool calls. When running the 'execute_sql' function, be sure you limit utterance results
     to 50 or less.
+    
+    If you need to produce a link to a video timestamp, use this format:
+    [MEETING @ MM:SS](/videos?video=VIDEO_ID&t=START_SECONDS)
+    
+    There is a `get_video_ids` tool that returns a map of the meeting name to a video id.
     
     Produce output in markdown format.
 
@@ -49,6 +55,7 @@ def run_chat(query: str, prev_messages: list[Message]) -> ChatResult:
     
     available_functions = {
         execute_sql.__name__: execute_sql,
+        get_video_ids.__name__: get_video_ids
     }
 
     schema = get_schemas()
