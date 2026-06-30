@@ -17,9 +17,12 @@ type Message = UserMessage | AssistantMessage;
 type ChatHistoryItem = { role: "user" | "assistant"; content: string };
 
 function formatTimestamp(seconds: number): string {
-    const m = Math.floor(seconds / 60);
+    
+    const h = Math.floor(seconds / 60 / 60);
+    const m = Math.floor(seconds / 60) - h * 60;
     const s = Math.floor(seconds % 60);
-    return `${m}:${s.toString().padStart(2, "0")}`;
+
+    return [h, m, s].map(v=>v.toString().padStart(2, "0")).join(":");
 }
 
 function SourceList({ sources }: { sources: Source[] }) {
