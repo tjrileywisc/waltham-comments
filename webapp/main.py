@@ -10,9 +10,9 @@ from pydantic import BaseModel
 
 from yoyo import get_backend, read_migrations
 
-from lib.db import connect, get_transcript as db_get_transcript
+from lib.db import connect, readonly_connect, get_transcript as db_get_transcript, init_pools, close_pools
 from lib.admin import (
-    get_admin, get_meetings, get_clusters,
+    get_admin, get_meetings, get_clusters, get_todo_labeling_tasks,
     label_cluster, set_canonical, get_speakers,
     enqueue_relabel_job,
 )
@@ -59,6 +59,7 @@ class ChatResponse(BaseModel):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Startup; initializing resources.")
+    init_pools()
 
     db_url = os.environ["DATABASE_URL"].replace("postgresql://", "postgresql+psycopg://", 1)
     backend = get_backend(db_url)
@@ -74,6 +75,8 @@ async def lifespan(app: FastAPI):
     ]
 
     yield
+
+    close_pools()
 
 
 app = FastAPI(lifespan=lifespan)
@@ -222,6 +225,11 @@ def admin_label_cluster(meeting_id: int, cluster: str, body: LabelRequest, _=Dep
         label_cluster(conn, meeting_id, cluster, body.speaker_name)
     return {"ok": True}
 
+@app.get("/api/meetings/unlabeled_count")
+def total_unlabled_count():
+    with readonly_connect() as conn:
+        return {"count": get_todo_labeling_tasks(conn)}
+        
 
 @app.post("/api/admin/meetings/{meeting_id}/relabel")
 def admin_relabel_meeting(meeting_id: int, _=Depends(get_admin)):

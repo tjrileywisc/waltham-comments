@@ -1,5 +1,4 @@
 import os
-import psycopg
 import requests
 
 from lib.db import connect
@@ -58,7 +57,7 @@ def vector_search(query: str, filter_clause: str | None = None) -> list[Utteranc
 
 def exact_search(query: str) -> list[UtteranceResult]:
 
-    with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
+    with connect() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
