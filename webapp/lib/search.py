@@ -1,12 +1,19 @@
 import os
-import psycopg
 import requests
+
+from lib.db import connect
 
 EMBEDDINGS_SERVICE_URL = os.environ.get("EMBEDDINGS_SERVICE_URL", "http://embeddings-service:8001")
 
 type UtteranceResult = dict[str, str|float]
 
-def vector_search(query: str) -> list[UtteranceResult]:
+def vector_search(query: str, filter_clause: str | None = None) -> list[UtteranceResult]:
+    """
+    Semantic similarity search over meeting utterances.
+    Optionally filter results with a SQL WHERE clause fragment using these aliases:
+    u (utterances), m (meetings), s (speakers), ue (utterance_embeddings).
+    Example: filter_clause="s.speaker_name = 'John Smith'"
+    """
     resp = requests.post(
         f"{EMBEDDINGS_SERVICE_URL}/embeddings",
         json={"sentences": [query]},
@@ -15,17 +22,20 @@ def vector_search(query: str) -> list[UtteranceResult]:
     resp.raise_for_status()
     query_embedding = resp.json()["embeddings"][0]
     vec_str = "[" + ",".join(str(x) for x in query_embedding) + "]"
-    
-    with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
+
+    where = f"WHERE {filter_clause}" if filter_clause else ""
+
+    with connect() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                """
+                f"""
                 SELECT u.id, m.meeting_name, u.start_time, u.text, s.speaker_name,
                     1 - (ue.embedding <=> %s::vector) AS score
                 FROM utterance_embeddings ue
                 JOIN utterances u ON ue.utterance_id = u.id
                 JOIN speakers s on s.id = u.speaker_id
                 JOIN meetings m on u.meeting_id = m.id
+                {where}
                 ORDER BY ue.embedding <=> %s::vector
                 LIMIT 10
                 """,
@@ -47,7 +57,7 @@ def vector_search(query: str) -> list[UtteranceResult]:
 
 def exact_search(query: str) -> list[UtteranceResult]:
 
-    with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
+    with connect() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """

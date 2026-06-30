@@ -56,6 +56,27 @@ def get_meetings(conn) -> list[dict]:
         for r in rows
     ]
 
+def get_todo_labeling_tasks(conn) -> int:
+    """
+    Get the total number of unalabeled
+    speaker clusters in the database.
+    """
+
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT SUM(ul.unlabeled_count) FROM (
+            SELECT
+                m.meeting_name,
+                COUNT(se.id) FILTER (WHERE se.speaker_id IS NULL) as unlabeled_count
+            FROM meetings m
+                LEFT JOIN speaker_embeddings se on se.meeting_id = m.id
+            GROUP BY m.id
+            ) AS ul
+            """
+        )
+        
+        return cur.fetchone()
 
 def get_clusters(conn, meeting_id: int) -> list[dict]:
     with conn.cursor() as cur:

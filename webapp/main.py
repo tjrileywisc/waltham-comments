@@ -10,14 +10,17 @@ from pydantic import BaseModel
 
 from yoyo import get_backend, read_migrations
 
-from lib.db import connect, get_transcript as db_get_transcript
+from lib.db import connect, readonly_connect, get_transcript as db_get_transcript, init_pools, close_pools
 from lib.admin import (
-    get_admin, get_meetings, get_clusters,
+    get_admin, get_meetings, get_clusters, get_todo_labeling_tasks,
     label_cluster, set_canonical, get_speakers,
     enqueue_relabel_job,
 )
 from lib.search import do_search
+from lib.chat import run_chat
+from lib import state
 from monitoring import setup_logging
+import requests as http_requests
 
 logger = setup_logging("webapp")
 
@@ -34,9 +37,29 @@ class SearchResult(BaseModel):
 class LabelRequest(BaseModel):
     speaker_name: str
 
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+class ChatRequest(BaseModel):
+    messages: list[ChatMessage]
+    query: str
+
+class ChatSource(BaseModel):
+    meeting_name: str
+    speaker_name: str
+    video_id: int | None
+    start: float
+    text: str
+
+class ChatResponse(BaseModel):
+    answer: str
+    sources: list[ChatSource]
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Startup; initializing resources.")
+    init_pools()
 
     db_url = os.environ["DATABASE_URL"].replace("postgresql://", "postgresql+psycopg://", 1)
     backend = get_backend(db_url)
@@ -45,14 +68,15 @@ async def lifespan(app: FastAPI):
         backend.apply_migrations(backend.to_apply(migrations))
     logger.info("Database migrations applied.")
 
-    global VIDEO_DB
     files = os.listdir(os.environ["DATA_DIR"] + "/videos")
-    VIDEO_DB = [
+    state.VIDEO_DB = [
         {"video_id": i, "name": f.replace(".mp4", "")}
         for i, f in enumerate(files)
     ]
 
     yield
+
+    close_pools()
 
 
 app = FastAPI(lifespan=lifespan)
@@ -70,11 +94,10 @@ if Path("./frontend/dist/assets").exists():
         name="static"
     )
 
-VIDEO_DB = list()
 
 @app.get("/api/transcript/{video_id}")
 def get_transcript(video_id: int):
-    name = VIDEO_DB[video_id]["name"]
+    name = state.VIDEO_DB[video_id]["name"]
     with connect() as conn:
         rows = db_get_transcript(conn, name)
     if not rows:
@@ -84,7 +107,7 @@ def get_transcript(video_id: int):
 
 @app.get("/api/video/{video_id}")
 def get_video(video_id: int, request: Request) -> StreamingResponse:
-    path = os.environ['DATA_DIR'] + "/videos/" + VIDEO_DB[video_id]["name"] + ".mp4"
+    path = os.environ['DATA_DIR'] + "/videos/" + state.VIDEO_DB[video_id]["name"] + ".mp4"
 
     video_path = Path(path)
     if not video_path.exists:
@@ -121,7 +144,7 @@ def get_video(video_id: int, request: Request) -> StreamingResponse:
 
 @app.get("/api/videos", response_model=list[VideoSummary])
 def get_videos():
-    return VIDEO_DB
+    return state.VIDEO_DB
 
 
 @app.get("/about")
@@ -136,7 +159,7 @@ def healthcheck() -> int:
 @app.get("/api/search", response_model=list[SearchResult])
 def search(query: str):
     results = do_search(query)
-    name_to_id = {v["name"]: v["video_id"] for v in VIDEO_DB}
+    name_to_id = state.get_video_ids()
     matching = []
     for r in results:
         video_id = name_to_id.get(r["meeting_name"])
@@ -147,9 +170,36 @@ def search(query: str):
     return matching
 
 
+@app.post("/api/chat", response_model=ChatResponse)
+def chat_endpoint(body: ChatRequest) -> ChatResponse:
+    """Accept a query and conversation history, return an LLM answer with cited sources."""
+    try:
+        result = run_chat(
+            query=body.query,
+            prev_messages=[m.model_dump() for m in body.messages],
+        )
+    except http_requests.exceptions.ConnectionError:
+        raise HTTPException(status_code=503, detail="Chat service is currently unavailable.")
+    except http_requests.exceptions.HTTPError:
+        raise HTTPException(status_code=502, detail="Chat service returned an error.")
+
+    name_to_id = state.get_video_ids()
+    sources = [
+        ChatSource(
+            meeting_name=u["meeting_name"],
+            speaker_name=u["speaker_name"],
+            video_id=name_to_id.get(u["meeting_name"]),
+            start=u["start"],
+            text=u["text"],
+        )
+        for u in result["utterances"]
+    ]
+    return ChatResponse(answer=result["answer"], sources=sources)
+
+
 @app.get("/api/admin/meetings")
 def admin_meetings(_=Depends(get_admin)):
-    name_to_video_id = {v["name"]: v["video_id"] for v in VIDEO_DB}
+    name_to_video_id = state.get_video_ids()
     with connect() as conn:
         meetings = get_meetings(conn)
     for m in meetings:
@@ -159,7 +209,7 @@ def admin_meetings(_=Depends(get_admin)):
 
 @app.get("/api/admin/meetings/{meeting_id}/clusters")
 def admin_meeting_clusters(meeting_id: int, _=Depends(get_admin)):
-    name_to_video_id = {v["name"]: v["video_id"] for v in VIDEO_DB}
+    name_to_video_id = state.get_video_ids()
     with connect() as conn:
         clusters = get_clusters(conn, meeting_id)
         with conn.cursor() as cur:
@@ -175,6 +225,11 @@ def admin_label_cluster(meeting_id: int, cluster: str, body: LabelRequest, _=Dep
         label_cluster(conn, meeting_id, cluster, body.speaker_name)
     return {"ok": True}
 
+@app.get("/api/meetings/unlabeled_count")
+def total_unlabled_count():
+    with readonly_connect() as conn:
+        return {"count": get_todo_labeling_tasks(conn)}
+        
 
 @app.post("/api/admin/meetings/{meeting_id}/relabel")
 def admin_relabel_meeting(meeting_id: int, _=Depends(get_admin)):

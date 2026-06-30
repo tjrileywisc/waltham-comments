@@ -29,6 +29,7 @@ dependencies = [
     "tqdm>=4.67.1",
     "whisperx>=3.7.6",
     "httpx2>=2.4.0",
+    "ollama>=0.6.2",
 ]
 
 [[tool.uv.index]]
