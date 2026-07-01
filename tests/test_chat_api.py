@@ -28,7 +28,7 @@ MOCK_CHAT_RESULT = {
 
 
 def test_chat_returns_answer_and_sources(mocker):
-    mocker.patch("main.chat_rag", return_value=MOCK_CHAT_RESULT)
+    mocker.patch("main.run_chat", return_value=MOCK_CHAT_RESULT)
     r = client.post("/api/chat", json={"messages": [], "query": "parking garage?"})
     assert r.status_code == 200
     data = r.json()
@@ -40,19 +40,19 @@ def test_chat_returns_answer_and_sources(mocker):
 
 
 def test_chat_returns_503_when_ollama_unreachable(mocker):
-    mocker.patch("main.chat_rag", side_effect=req.exceptions.ConnectionError())
+    mocker.patch("main.run_chat", side_effect=req.exceptions.ConnectionError())
     r = client.post("/api/chat", json={"messages": [], "query": "test?"})
     assert r.status_code == 503
 
 
 def test_chat_returns_502_on_ollama_error(mocker):
-    mocker.patch("main.chat_rag", side_effect=req.exceptions.HTTPError("500"))
+    mocker.patch("main.run_chat", side_effect=req.exceptions.HTTPError("500"))
     r = client.post("/api/chat", json={"messages": [], "query": "test?"})
     assert r.status_code == 502
 
 
 def test_chat_passes_history_and_query_to_rag(mocker):
-    mock = mocker.patch("main.chat_rag", return_value=MOCK_CHAT_RESULT)
+    mock = mocker.patch("main.run_chat", return_value=MOCK_CHAT_RESULT)
     history = [
         {"role": "user", "content": "First question"},
         {"role": "assistant", "content": "First answer"},
@@ -60,4 +60,4 @@ def test_chat_passes_history_and_query_to_rag(mocker):
     client.post("/api/chat", json={"messages": history, "query": "follow-up?"})
     _, kwargs = mock.call_args
     assert kwargs["query"] == "follow-up?"
-    assert kwargs["messages"][0]["content"] == "First question"
+    assert kwargs["prev_messages"][0]["content"] == "First question"

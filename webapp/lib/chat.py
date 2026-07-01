@@ -1,4 +1,5 @@
 import os
+import requests
 from monitoring import setup_logging
 import json
 from lib.search import UtteranceResult
@@ -7,8 +8,9 @@ from ollama import ChatResponse, Client, Message
 
 logger = setup_logging("webapp")
 
-OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://ollama:11434")
-OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "gemma4:12b")
+OLLAMA_URL: str = os.environ.get("OLLAMA_URL", "http://ollama:11434")
+OLLAMA_MODEL: str = os.environ.get("OLLAMA_MODEL", "gemma4:12b")
+NUM_CTX: int = 16384
 
 SYSTEM_PROMPT = (
     """
@@ -45,6 +47,27 @@ def build_context_message(utterances: list[UtteranceResult]) -> str:
         lines.append(f"[{u['speaker_name']}, {u['meeting_name']}, {minutes}:{seconds:02d}] {u['text']}")
     return "Context from meeting transcripts:\n\n" + "\n".join(lines)
 
+def _compress_history(client: Client, prev_messages: list[Message]) -> list[Message]:
+    """
+    Command the LLM to shrink the message context to save on memory for
+    long conversations.
+    """
+    
+    prev_messages.append({
+        "role": "user", "content": "Summarize the above conversation concisely, preserving key facts, tool results, and any partial answers."
+    })
+    summary_response = client.chat(
+        model=OLLAMA_MODEL,
+        messages=prev_messages,
+        think=False
+    )
+    summary = summary_response.message.content
+    prev_messages = [
+        {"role": "user", "content": f"[CONVERSATION SUMMARY]\n{summary}"},
+        {"role": "assistant", "content": "Understood."}
+    ]
+    
+    return prev_messages
 
 def run_chat(query: str, prev_messages: list[Message]) -> ChatResult:
     """Run the RAG pipeline: retrieve context, build prompt, call Ollama, return answer + sources."""
@@ -58,9 +81,6 @@ def run_chat(query: str, prev_messages: list[Message]) -> ChatResult:
 
     schema = get_schemas()
     system_content = SYSTEM_PROMPT + f"\n\nDatabase schema:\n{schema}"
-    
-    # TODO:
-    # force summary if prev_messages is too big?
 
     ollama_messages = [
         {"role": "system", "content": system_content},
@@ -80,10 +100,16 @@ def run_chat(query: str, prev_messages: list[Message]) -> ChatResult:
             messages=ollama_messages,
             tools=[execute_sql, get_video_ids, vector_search],
             think=True,
-            options={"num_ctx": 16384},
+            options={"num_ctx": NUM_CTX},
         )
 
         ollama_messages.append(response.message)
+        
+        # automatically summarize if context has gotten large
+        if response.prompt_eval_count and response.prompt_eval_count / NUM_CTX >= 0.8:
+            logger.info(f"80% of context has been used. Next conversation round will proceed from a summary.")
+            compressed = _compress_history(client, ollama_messages[1:-1])
+            ollama_messages = [ollama_messages[0], *compressed, ollama_messages[-1]]
 
         if response.message.thinking:
             logger.debug(f"Thinking: {response.message.thinking}")

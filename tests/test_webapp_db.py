@@ -9,7 +9,7 @@ def test_get_transcript_returns_rows():
         (1, 2.5, 4.0, "World", "SPEAKER_01"),
     ]])
 
-    from lib.db import get_transcript
+    from webapp.lib.db import get_transcript
     result = get_transcript(mock_conn, "Test Meeting")
 
     assert result == [
@@ -21,7 +21,7 @@ def test_get_transcript_returns_rows():
 def test_get_transcript_empty_returns_empty_list():
     mock_conn = make_mock_conn(fetchall_results=[[]])
 
-    from lib.db import get_transcript
+    from webapp.lib.db import get_transcript
     result = get_transcript(mock_conn, "Missing Meeting")
     assert result == []
 
@@ -35,11 +35,10 @@ def test_vector_search_returns_results(mocker, monkeypatch):
 
     mock_embed_resp = MagicMock()
     mock_embed_resp.json.return_value = {"embeddings": [[0.1] * 384]}
-    mocker.patch("lib.search.requests.post", return_value=mock_embed_resp)
-    mocker.patch("lib.search.psycopg.connect", return_value=mock_conn)
-    monkeypatch.setenv("DATABASE_URL", "postgresql://test")
+    mocker.patch("webapp.lib.search.requests.post", return_value=mock_embed_resp)
+    mocker.patch("webapp.lib.search.connect", return_value=mock_conn)
 
-    from lib.search import vector_search
+    from webapp.lib.search import vector_search
     results = vector_search("traffic")
 
     assert len(results) == 2
