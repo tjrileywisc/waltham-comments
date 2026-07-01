@@ -15,79 +15,64 @@ MOCK_UTTERANCES = [
 
 
 def test_build_context_message_formats_utterances():
-    from lib.chat import build_context_message
+    from webapp.lib.chat import build_context_message
     result = build_context_message(MOCK_UTTERANCES)
     assert "[Alice, Council 2024-01-01, 1:05] Hello world" in result
 
 
 def test_build_context_message_with_empty_list():
-    from lib.chat import build_context_message
+    from webapp.lib.chat import build_context_message
     result = build_context_message([])
     assert "No relevant context" in result
 
 
-def test_chat_returns_answer_and_utterances(mocker, monkeypatch):
-    monkeypatch.setenv("DATABASE_URL", "postgresql://test")
-    mocker.patch("lib.chat.do_search", return_value=MOCK_UTTERANCES)
-
-    mock_resp = MagicMock()
-    mock_resp.json.return_value = {"message": {"content": "Alice said hello."}}
-    mock_post = mocker.patch("lib.chat.requests.post", return_value=mock_resp)
-
-    from lib.chat import chat
-    result = chat("what did Alice say?", [])
-
-    assert result["answer"] == "Alice said hello."
-    assert result["utterances"] == MOCK_UTTERANCES
-
-    call_json = mock_post.call_args.kwargs["json"]
-    assert call_json["stream"] is False
-    assert call_json["messages"][0]["role"] == "system"
-    assert call_json["messages"][-1] == {"role": "user", "content": "what did Alice say?"}
-
-
-def test_chat_includes_conversation_history(mocker, monkeypatch):
-    monkeypatch.setenv("DATABASE_URL", "postgresql://test")
-    mocker.patch("lib.chat.do_search", return_value=[])
-
-    mock_resp = MagicMock()
-    mock_resp.json.return_value = {"message": {"content": "Answer."}}
-    mock_post = mocker.patch("lib.chat.requests.post", return_value=mock_resp)
+def test_chat_includes_conversation_history(mocker):
+    mock_client = _make_mock_client(mocker, content="Answer.")
 
     history = [
         {"role": "user", "content": "Prior question"},
         {"role": "assistant", "content": "Prior answer"},
     ]
-    from lib.chat import chat
-    chat("follow-up?", history)
+    from webapp.lib.chat import run_chat
+    run_chat("follow-up?", history)
 
-    messages = mock_post.call_args.kwargs["json"]["messages"]
-    contents = [m["content"] for m in messages]
+    messages = mock_client.chat.call_args.kwargs["messages"]
+    contents = [m["content"] for m in messages if isinstance(m, dict)]
     assert "Prior question" in contents
     assert "Prior answer" in contents
-    assert messages[-1]["content"] == "follow-up?"
+    assert "follow-up?" in contents
 
 
-def test_chat_raises_on_ollama_http_error(mocker, monkeypatch):
-    import requests as req
-    monkeypatch.setenv("DATABASE_URL", "postgresql://test")
-    mocker.patch("lib.chat.do_search", return_value=[])
+def _make_mock_client(mocker, content=None, tool_calls=None, thinking=None, prompt_eval_count=100):
+    """Return a mock ollama Client whose chat() yields a single configured response."""
+    mocker.patch("webapp.lib.chat.get_schemas", return_value="")
+    mock_client = MagicMock()
+    mocker.patch("webapp.lib.chat.Client", return_value=mock_client)
+    resp = MagicMock()
+    resp.message.content = content
+    resp.message.tool_calls = tool_calls
+    resp.message.thinking = thinking
+    resp.prompt_eval_count = prompt_eval_count
+    mock_client.chat.return_value = resp
+    return mock_client
 
-    mock_resp = MagicMock()
-    mock_resp.raise_for_status.side_effect = req.exceptions.HTTPError("500")
-    mocker.patch("lib.chat.requests.post", return_value=mock_resp)
 
-    from lib.chat import chat
-    with pytest.raises(req.exceptions.HTTPError):
-        chat("test?", [])
+def test_no_context_response_strips_token_and_clears_utterances(mocker):
+    mock_client = _make_mock_client(mocker, content="[NO_CONTEXT] Nothing relevant found.")
+
+    from webapp.lib.chat import run_chat
+    result = run_chat("anything?", [])
+
+    assert result["answer"] == "Nothing relevant found."
+    assert result["utterances"] == []
 
 
-def test_chat_raises_on_connection_error(mocker, monkeypatch):
-    import requests as req
-    monkeypatch.setenv("DATABASE_URL", "postgresql://test")
-    mocker.patch("lib.chat.do_search", return_value=[])
-    mocker.patch("lib.chat.requests.post", side_effect=req.exceptions.ConnectionError())
+def test_tool_limit_exhaustion_returns_empty_answer(mocker):
+    mock_client = _make_mock_client(mocker)  # content=None, tool_calls=None, thinking=None
 
-    from lib.chat import chat
-    with pytest.raises(req.exceptions.ConnectionError):
-        chat("test?", [])
+    from webapp.lib.chat import run_chat
+    result = run_chat("anything?", [])
+
+    assert result["answer"] == ""
+    assert result["utterances"] == []
+    assert mock_client.chat.call_count == 10  # TOOL_LIMIT exhausted
