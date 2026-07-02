@@ -19,7 +19,7 @@ services:
   embeddings-service:
     build:
       context: .
-      dockerfile: embeddings-service/Dockerfile
+      dockerfile: embeddings_service/Dockerfile
     image: embeddings-service
     environment:
       HF_TOKEN: ${HF_TOKEN}
@@ -45,7 +45,7 @@ services:
   meeting-downloader:
     build:
       context: .
-      dockerfile: meeting-downloader/Dockerfile
+      dockerfile: meeting_downloader/Dockerfile
     image: meeting-downloader
     volumes:
       - C:/workspace/waltham-comments/videos:/app/videos
@@ -53,7 +53,7 @@ services:
   transcription-service:
     build:
       context: .
-      dockerfile: transcription-service/Dockerfile
+      dockerfile: transcription_service/Dockerfile
     image: transcription-service
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}

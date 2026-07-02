@@ -44,6 +44,6 @@ torchaudio = [{ index = "pytorch-cu128" }]
 torchvision = [{ index = "pytorch-cu128" }]
 
 [tool.pytest.ini_options]
-addopts = "--cov=meeting-downloader --cov=transcription-service --cov=embeddings-service --cov-report=term-missing --cov-report=xml:coverage.xml -n auto"
+addopts = "--cov=meeting_downloader --cov=transcription_service --cov=embeddings_service --cov-report=term-missing --cov-report=xml:coverage.xml -n auto"
 testpaths = ["tests"]
 pythonpath = ["webapp"]

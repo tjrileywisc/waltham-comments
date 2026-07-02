@@ -2,9 +2,9 @@ $ErrorActionPreference = "Stop"
 $root = $PSScriptRoot
 
 $images = @(
-    @{ tag = "transcription-service"; dockerfile = "$root\transcription-service\Dockerfile"; context = $root },
-    @{ tag = "meeting-downloader";    dockerfile = "$root\meeting-downloader\Dockerfile";    context = $root },
-    @{ tag = "embeddings-service";    dockerfile = "$root\embeddings-service\Dockerfile";    context = $root },
+    @{ tag = "transcription-service"; dockerfile = "$root\transcription_service\Dockerfile"; context = $root },
+    @{ tag = "meeting-downloader";    dockerfile = "$root\meeting_downloader\Dockerfile";    context = $root },
+    @{ tag = "embeddings-service";    dockerfile = "$root\embeddings_service\Dockerfile";    context = $root },
     @{ tag = "comments-web";          dockerfile = "$root\webapp\Dockerfile";                context = "$root\webapp" }
 )
 

@@ -4,10 +4,10 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 WORKDIR /app
 
-COPY embeddings-service/pyproject.toml .
+COPY embeddings_service/pyproject.toml .
 RUN uv sync --no-dev
 
-COPY embeddings-service/main.py embeddings-service/sentence_embeddings.py .
+COPY embeddings_service/main.py embeddings_service/sentence_embeddings.py .
 COPY monitoring.py log_config.json .
 
 CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001", "--log-config", "log_config.json"]

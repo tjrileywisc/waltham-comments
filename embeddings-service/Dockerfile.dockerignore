@@ -1,7 +1,0 @@
-**
-!embeddings-service/
-!embeddings-service/pyproject.toml
-!embeddings-service/main.py
-!embeddings-service/sentence_embeddings.py
-!monitoring.py
-!log_config.json
