@@ -157,7 +157,7 @@ def healthcheck() -> int:
 
 
 @app.get("/api/search", response_model=list[SearchResult])
-def search(query: str):
+def search(query: str) -> list[SearchResult]:
     results = do_search(query)
     name_to_id = state.get_video_ids()
     matching = []
