@@ -1,9 +1,8 @@
 import os
-import requests
 from monitoring import setup_logging
 import json
 from lib.search import UtteranceResult
-from lib.tools import get_schemas, execute_sql, get_video_ids, vector_search
+from lib.tools import get_schemas, get_gis_schemas, execute_gis_sql, execute_meetings_sql, get_video_ids, vector_search
 from ollama import ChatResponse, Client, Message
 
 logger = setup_logging("webapp")
@@ -15,16 +14,21 @@ NUM_CTX: int = 16384
 SYSTEM_PROMPT = (
     """
     You are an assistant that answers questions about Waltham, MA city council meetings.
-    You have access to a read-only account in a postgres database. The relevant table schemas are provided to you.
-    You will be limited to 10 back and forth tool calls, and thinking cycles (when you hit the limit, you will be
-    told to wrap it up with what you have). When running the 'execute_sql' function, be sure you limit utterance results
-    to 50 or less.
+    You have access to a read-only accounts in a postgres database containing meeting data, and 
+    a postgis database containing relevant GIS data for the city. The relevant table schemas are provided to you.
+        
+    You will be limited to 20 back and forth tool calls, and thinking cycles (when you hit the limit, you will be
+    told to wrap it up with what you have). When running the 'execute_*_sql' functions, be sure you limit utterance or GIS results
+    to 50 records or less.
     
     If you need to produce a link to a video timestamp, use this format:
     [MEETING @ MM:SS](/videos?video=VIDEO_ID&t=START_SECONDS)
+    
+    If you need to output data from GIS, use human-readable JSON objects.
 
     Produce output in markdown format.
 
+    For meetings data only:
     Answer using ONLY the provided context from meeting transcripts.
     Strongly prefer to provide example utterances with the speaker's name and meeting name when referencing information.
     If the provided context does not contain relevant information to answer the question,
@@ -74,13 +78,16 @@ def run_chat(query: str, prev_messages: list[Message]) -> ChatResult:
     
     client = Client(OLLAMA_URL)
     available_functions = {
-        execute_sql.__name__: execute_sql,
+        execute_meetings_sql.__name__: execute_meetings_sql,
+        execute_gis_sql.__name__: execute_gis_sql,
         get_video_ids.__name__: get_video_ids,
         vector_search.__name__: vector_search,
     }
 
+    gis_schema = get_gis_schemas()
     schema = get_schemas()
-    system_content = SYSTEM_PROMPT + f"\n\nDatabase schema:\n{schema}"
+
+    system_content = SYSTEM_PROMPT + f"\n\nDatabase schema:\n{schema}" + f"\n\nGIS Database schema:\n{gis_schema}"
 
     ollama_messages = [
         {"role": "system", "content": system_content},
@@ -88,7 +95,7 @@ def run_chat(query: str, prev_messages: list[Message]) -> ChatResult:
         {"role": "user", "content": query},
     ]
     
-    TOOL_LIMIT = 10
+    TOOL_LIMIT = 20
     THINK_LIMIT = 3
     answer = None
     utterances: list[UtteranceResult] = []
@@ -98,7 +105,7 @@ def run_chat(query: str, prev_messages: list[Message]) -> ChatResult:
         response: ChatResponse = client.chat(
             model=OLLAMA_MODEL,
             messages=ollama_messages,
-            tools=[execute_sql, get_video_ids, vector_search],
+            tools=[execute_meetings_sql, get_video_ids, vector_search],
             think=True,
             options={"num_ctx": NUM_CTX},
         )
