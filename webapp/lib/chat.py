@@ -14,6 +14,7 @@ NUM_CTX: int = 16384
 SYSTEM_PROMPT = (
     """
     You are an assistant that answers questions about Waltham, MA city council meetings.
+    You are also a GIS expert.
     You have access to a read-only accounts in a postgres database containing meeting data, and 
     a postgis database containing relevant GIS data for the city. The relevant table schemas are provided to you.
         
