@@ -7,7 +7,7 @@ _readonly_pool: ConnectionPool | None = None
 
 def init_pools() -> None:
     """Initialize connection pools; call once at application startup."""
-    global _pool, _readonly_pool, _gis_pool
+    global _pool, _readonly_pool
     _pool = ConnectionPool(os.environ["DATABASE_URL"], min_size=0, max_size=10)
 
     ro_user = os.environ["POSTGRES_READONLY_USER"]
