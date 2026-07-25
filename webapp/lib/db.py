@@ -15,7 +15,7 @@ def init_pools() -> None:
     ro_password = os.environ["POSTGRES_READONLY_PASSWORD"]
     ro_db = os.environ["POSTGRES_DB"]
     _readonly_pool = ConnectionPool(
-        f"postgresql://{ro_user}:{ro_password}@postgres:5432/{ro_db}",
+        f"postgresql://{ro_user}:{ro_password}@postgres:5444/{ro_db}",
         min_size=0,
         max_size=5,
     )
@@ -23,7 +23,7 @@ def init_pools() -> None:
     POSTGIS_HOST = os.environ["POSTGIS_HOST"]
     POSTGIS_DB = os.environ["POSTGIS_DB"]
     _gis_pool = ConnectionPool(
-        f"postgresql://{ro_user}:{ro_password}@{POSTGIS_HOST}/walthamdata",
+        f"postgresql://{ro_user}:{ro_password}@{POSTGIS_HOST}/{POSTGIS_DB}",
         min_size=0,
         max_size=5
     )
