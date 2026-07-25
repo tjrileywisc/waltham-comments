@@ -4,7 +4,6 @@ from psycopg_pool import ConnectionPool
 
 _pool: ConnectionPool | None = None
 _readonly_pool: ConnectionPool | None = None
-_gis_pool: ConnectionPool | None = None
 
 def init_pools() -> None:
     """Initialize connection pools; call once at application startup."""
@@ -19,14 +18,6 @@ def init_pools() -> None:
         min_size=0,
         max_size=5,
     )
-    
-    POSTGIS_HOST = os.environ["POSTGIS_HOST"]
-    POSTGIS_DB = os.environ["POSTGIS_DB"]
-    _gis_pool = ConnectionPool(
-        f"postgresql://{ro_user}:{ro_password}@{POSTGIS_HOST}/{POSTGIS_DB}",
-        min_size=0,
-        max_size=5
-    )
 
 def close_pools() -> None:
     """Close connection pools; call at application shutdown."""
@@ -34,8 +25,6 @@ def close_pools() -> None:
         _pool.close()
     if _readonly_pool:
         _readonly_pool.close()
-    if _gis_pool:
-        _gis_pool.close()
 
 def connect() -> psycopg.Connection:
     """Return a pooled connection to the main database."""
@@ -46,11 +35,6 @@ def readonly_connect() -> psycopg.Connection:
     """Return a pooled connection to the read-only database account."""
     assert _readonly_pool is not None, "Pools not initialized"
     return _readonly_pool.connection()
-
-def gis_connect() -> psycopg.Connection:
-    """Return a pooled connection to the main database."""
-    assert _gis_pool is not None, "Pools not initialized"
-    return _gis_pool.connection()
 
 def get_transcript(conn: psycopg.Connection, meeting_name: str) -> list[dict]:
     """Fetch all utterances for a meeting, ordered by segment index."""
