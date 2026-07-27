@@ -1,9 +1,17 @@
 import os
-from monitoring import setup_logging
 import json
+
+from monitoring import setup_logging
 from lib.search import UtteranceResult
-from lib.tools import get_schemas, get_gis_schemas, execute_gis_sql, execute_meetings_sql, get_video_ids, vector_search
-from ollama import ChatResponse, Client, Message
+from lib.tools import get_schemas, execute_meetings_sql, video_ids_tool, vector_search_tool
+from mcp import ClientSession
+from mcp.client.streamable_http import streamable_http_client
+
+from langchain_ollama import ChatOllama
+from langchain.agents import create_agent
+from langchain.agents.middleware import SummarizationMiddleware, ToolCallLimitMiddleware, ToolErrorMiddleware, ToolRetryMiddleware, ToolCallRequest
+from langchain_mcp_adapters.tools import load_mcp_tools
+from langchain.messages import HumanMessage, SystemMessage, ToolMessage, AIMessage
 
 logger = setup_logging("webapp")
 
@@ -16,7 +24,7 @@ SYSTEM_PROMPT = (
     You are an assistant that answers questions about Waltham, MA city council meetings.
     You are also a GIS expert.
     You have access to a read-only accounts in a postgres database containing meeting data, and 
-    a postgis database containing relevant GIS data for the city. The relevant table schemas are provided to you.
+    a postgis database containing relevant GIS data for the city.
         
     You will be limited to 20 back and forth tool calls, and thinking cycles (when you hit the limit, you will be
     told to wrap it up with what you have). When running the 'execute_*_sql' functions, be sure you limit utterance or GIS results
@@ -52,136 +60,82 @@ def build_context_message(utterances: list[UtteranceResult]) -> str:
         lines.append(f"[{u['speaker_name']}, {u['meeting_name']}, {minutes}:{seconds:02d}] {u['text']}")
     return "Context from meeting transcripts:\n\n" + "\n".join(lines)
 
-def _compress_history(client: Client, prev_messages: list[Message]) -> list[Message]:
-    """
-    Command the LLM to shrink the message context to save on memory for
-    long conversations.
-    """
-    
-    prev_messages.append({
-        "role": "user", "content": "Summarize the above conversation concisely, preserving key facts, tool results, and any partial answers."
-    })
-    summary_response = client.chat(
-        model=OLLAMA_MODEL,
-        messages=prev_messages,
-        think=False
-    )
-    summary = summary_response.message.content
-    prev_messages = [
-        {"role": "user", "content": f"[CONVERSATION SUMMARY]\n{summary}"},
-        {"role": "assistant", "content": "Understood."}
-    ]
-    
-    return prev_messages
+def on_tool_error(exc: Exception, request: ToolCallRequest) -> str | None:
+    """Handle errors during tool calls"""
+    return f"`{request.tool_call['name']}` failed: {type(exc).__name__}. Fix the input and retry."
 
-def run_chat(query: str, prev_messages: list[Message]) -> ChatResult:
+async def run_chat(query: str, prev_messages: list) -> ChatResult:
     """Run the RAG pipeline: retrieve context, build prompt, call Ollama, return answer + sources."""
     
-    client = Client(OLLAMA_URL)
-    available_functions = {
-        execute_meetings_sql.__name__: execute_meetings_sql,
-        execute_gis_sql.__name__: execute_gis_sql,
-        get_video_ids.__name__: get_video_ids,
-        vector_search.__name__: vector_search,
-    }
-
-    gis_schema = get_gis_schemas()
-    schema = get_schemas()
-
-    system_content = SYSTEM_PROMPT + f"\n\nDatabase schema:\n{schema}" + f"\n\nGIS Database schema:\n{gis_schema}"
-
-    ollama_messages = [
-        {"role": "system", "content": system_content},
-        *prev_messages,
-        {"role": "user", "content": query},
+    TOOL_LIMIT = 20
+    UTTERANCE_TOOLS = [
+        execute_meetings_sql.name,
+        vector_search_tool().name
     ]
     
-    TOOL_LIMIT = 20
-    THINK_LIMIT = 3
-    answer = None
-    utterances: list[UtteranceResult] = []
-    _utterance_keys = {"text", "speaker_name", "meeting_name", "start_time"}
+    async with streamable_http_client(f"http://{os.environ['POSTGIS_MCP']}") as (read, write, _):
+        async with ClientSession(read, write) as session:
+    
+            await session.initialize()
+            tools = await load_mcp_tools(session)
+            tools.extend([
+                execute_meetings_sql, vector_search_tool(),
+                get_schemas, video_ids_tool()
+            ])
 
-    while TOOL_LIMIT > 0:
-        response: ChatResponse = client.chat(
-            model=OLLAMA_MODEL,
-            messages=ollama_messages,
-            tools=[execute_meetings_sql, get_video_ids, vector_search],
-            think=True,
-            options={"num_ctx": NUM_CTX},
-        )
+            model = ChatOllama(
+                model=OLLAMA_MODEL,
+                base_url=OLLAMA_URL,
+                num_ctx=NUM_CTX,
+                temperature=1.0,
+                top_p=0.95,
+                top_k=64
+            )
 
-        ollama_messages.append(response.message)
-        
-        # automatically summarize if context has gotten large
-        if response.prompt_eval_count and response.prompt_eval_count / NUM_CTX >= 0.8:
-            logger.info(f"80% of context has been used. Next conversation round will proceed from a summary.")
-            compressed = _compress_history(client, ollama_messages[1:-1])
-            ollama_messages = [ollama_messages[0], *compressed, ollama_messages[-1]]
+            # ref. https://github.com/langchain-ai/langchain/issues/33732)
+            
+            agent = create_agent(# pyright: ignore[reportCallIssue]
+                model=model,
+                tools=tools,
+                middleware=[
+                    ToolRetryMiddleware(max_retries=3, on_failure="error"),
+                    ToolErrorMiddleware(on_error=on_tool_error),
+                    SummarizationMiddleware(
+                        model=model,
+                        trigger=("tokens", int(0.8 * NUM_CTX))
+                    ),
+                    ToolCallLimitMiddleware(run_limit=TOOL_LIMIT) # pyright: ignore[reportArgumentType]
+                ]
+            )
 
-        if response.message.thinking:
-            logger.debug(f"Thinking: {response.message.thinking}")
+            messages = [
+                SystemMessage(SYSTEM_PROMPT),
+                *prev_messages,
+                HumanMessage(query),
+            ]
 
-        if response.message.tool_calls:
-            failed_call = False
-            for tc in response.message.tool_calls:
-                if tc.function.name in available_functions:
-                    try:
-                        logger.debug(f"Calling {tc.function.name}")
-                        result = available_functions[tc.function.name](**tc.function.arguments)
-                    except Exception as e:
-                        result = f"Error: {e}. Your query was rejected. Please correct it and try again."
-                        failed_call = True
-                        logger.warning(f"Function call {tc.function.name} failed: {e}")
-                    finally:
-                        tool_content = json.dumps(result, default=str)[:8000] if isinstance(result, (list, dict)) else str(result)
-                        ollama_messages.append({'role': 'tool', 'tool_name': tc.function.name, 'content': tool_content})
+            result = await agent.ainvoke(
+                {"messages": messages}
+            )
+            
+            # look for utterances
+            utterances = []
+            _utterance_keys = {"text", "speaker_name", "meeting_name", "start_time"}
+            for message in result["messages"]:
+                if isinstance(message, ToolMessage) and message.name in UTTERANCE_TOOLS and message.artifact:
+                    rows = message.artifact
+                    if rows and isinstance(rows[0], dict) and _utterance_keys.issubset(rows[0].keys()):
+                        utterances.extend(rows)
+                    
+            # use last AIMesage as result
+            ai_messages = [message for message in result["messages"][::-1] if isinstance(message, AIMessage)]
+            
+            text_blocks = [b["text"] for b in ai_messages[0].content_blocks if b["type"] == "text"]
+            answer = text_blocks[0] if text_blocks else ""
 
-                    if failed_call:
-                        # The model shouldn't be allowed to fail more tool calls
-                        break
+            if answer.startswith("[NO_CONTEXT]"):
+                answer = answer[len("[NO_CONTEXT]"):].lstrip()
+                utterances = []
 
-                    if isinstance(result, list):
-                        for row in result:
-                            if not isinstance(row, dict):
-                                continue
-                            if _utterance_keys.issubset(row.keys()):
-                                utterances.append({**row, "start": row["start_time"]})
-                            elif tc.function.name == vector_search.__name__:
-                                utterances.append(row)
+            return {"answer": answer, "utterances": utterances}
 
-            if not failed_call:
-                TOOL_LIMIT -= 1
-
-        else:
-            # No tool calls — model is either thinking, done, or stuck
-            if response.message.thinking:
-                THINK_LIMIT -= 1
-                if THINK_LIMIT == 0:
-                    logger.warning("Think limit reached; prompting model to wrap up")
-                    ollama_messages.append({
-                        "role": "user",
-                        "content": "Please wrap up and provide your answer now using what you have gathered so far. Do not make any further tool calls.",
-                    })
-                elif THINK_LIMIT < 0:
-                    answer = response.message.content
-                    logger.debug(f"Think limit exhausted; accepting content: {repr(answer)}")
-                    break
-
-            elif response.message.content:
-                answer = response.message.content
-                logger.debug(f"Final answer: {repr(answer)}")
-                break
-
-            else:
-                logger.warning("Empty response from model")
-                TOOL_LIMIT -= 1
-
-    if not answer:
-        answer = ""
-        utterances = []
-    elif answer.startswith("[NO_CONTEXT]"):
-        answer = answer[len("[NO_CONTEXT]"):].lstrip()
-        utterances = []
-
-    return {"answer": answer, "utterances": utterances}

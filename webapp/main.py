@@ -171,10 +171,10 @@ def search(query: str) -> list[SearchResult]:
 
 
 @app.post("/api/chat", response_model=ChatResponse)
-def chat_endpoint(body: ChatRequest) -> ChatResponse:
+async def chat_endpoint(body: ChatRequest) -> ChatResponse:
     """Accept a query and conversation history, return an LLM answer with cited sources."""
     try:
-        result = run_chat(
+        result = await run_chat(
             query=body.query,
             prev_messages=[m.model_dump() for m in body.messages],
         )
