@@ -1,0 +1,9 @@
+**
+!transcription_service/
+!transcription_service/pyproject.toml
+!transcription_service/main.py
+!transcription_service/transcription.py
+!transcription_service/identification.py
+!transcription_service/healthcheck.py
+!monitoring.py
+!log_config.json

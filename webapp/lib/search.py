@@ -2,10 +2,18 @@ import os
 import requests
 
 from lib.db import connect
+from typing import TypedDict
 
 EMBEDDINGS_SERVICE_URL = os.environ.get("EMBEDDINGS_SERVICE_URL", "http://embeddings-service:8001")
 
-type UtteranceResult = dict[str, str|float]
+class UtteranceResult(TypedDict):
+    id: int
+    video_id: int
+    meeting_name: str
+    start: float
+    text: str
+    speaker_name: str
+    score: float
 
 def vector_search(query: str, filter_clause: str | None = None) -> list[UtteranceResult]:
     """

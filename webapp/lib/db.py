@@ -2,10 +2,8 @@ import os
 import psycopg
 from psycopg_pool import ConnectionPool
 
-
 _pool: ConnectionPool | None = None
 _readonly_pool: ConnectionPool | None = None
-
 
 def init_pools() -> None:
     """Initialize connection pools; call once at application startup."""
@@ -21,7 +19,6 @@ def init_pools() -> None:
         max_size=5,
     )
 
-
 def close_pools() -> None:
     """Close connection pools; call at application shutdown."""
     if _pool:
@@ -29,18 +26,15 @@ def close_pools() -> None:
     if _readonly_pool:
         _readonly_pool.close()
 
-
 def connect() -> psycopg.Connection:
     """Return a pooled connection to the main database."""
     assert _pool is not None, "Pools not initialized"
     return _pool.connection()
 
-
 def readonly_connect() -> psycopg.Connection:
     """Return a pooled connection to the read-only database account."""
     assert _readonly_pool is not None, "Pools not initialized"
     return _readonly_pool.connection()
-
 
 def get_transcript(conn: psycopg.Connection, meeting_name: str) -> list[dict]:
     """Fetch all utterances for a meeting, ordered by segment index."""

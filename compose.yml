@@ -19,7 +19,7 @@ services:
   embeddings-service:
     build:
       context: .
-      dockerfile: embeddings-service/Dockerfile
+      dockerfile: embeddings_service/Dockerfile
     image: embeddings-service
     environment:
       HF_TOKEN: ${HF_TOKEN}
@@ -45,7 +45,7 @@ services:
   meeting-downloader:
     build:
       context: .
-      dockerfile: meeting-downloader/Dockerfile
+      dockerfile: meeting_downloader/Dockerfile
     image: meeting-downloader
     volumes:
       - C:/workspace/waltham-comments/videos:/app/videos
@@ -53,7 +53,7 @@ services:
   transcription-service:
     build:
       context: .
-      dockerfile: transcription-service/Dockerfile
+      dockerfile: transcription_service/Dockerfile
     image: transcription-service
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
@@ -94,6 +94,7 @@ services:
       POSTGRES_READONLY_USER: ${POSTGRES_READONLY_USER}
       POSTGRES_READONLY_PASSWORD: ${POSTGRES_READONLY_PASSWORD}
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      POSTGIS_MCP: ${POSTGIS_MCP}
       EMBEDDINGS_SERVICE_URL: http://embeddings-service:8001
       ADMIN_USER: ${ADMIN_USER}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
@@ -113,6 +114,13 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    networks:
+      - default
+      - waltham-gis
 
 volumes:
   postgres_data:
+
+networks:
+  waltham-gis:
+      external: true
